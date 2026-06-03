@@ -2,12 +2,12 @@ import time
 
 import arxiv as _arxiv
 import wikipedia as _wiki_pkg
+from langchain_community.tools import WikipediaQueryRun
+from langchain_community.utilities import WikipediaAPIWrapper
 from langchain_core.tools import tool
 
-from ..module.import_deps import WikipediaAPIWrapper, WikipediaQueryRun
 
-
-# ── arXiv: custom tool to keep max_results low and retry on 429 ──────────────
+# ── arXiv ─────────────────────────────────────────────────────────────────────
 _arxiv_client = _arxiv.Client()
 
 
@@ -36,7 +36,7 @@ def arxiv(query: str) -> str:
             return "\n\n---\n\n".join(parts)
         except Exception as exc:
             msg = str(exc)
-            if "429" in msg or "Too Many Requests" in msg.lower():
+            if "429" in msg or "too many requests" in msg.lower():
                 if attempt < 2:
                     time.sleep(12 * (attempt + 1))
                     continue
@@ -48,11 +48,7 @@ def arxiv(query: str) -> str:
 # ── Wikipedia ─────────────────────────────────────────────────────────────────
 _wiki_pkg.set_user_agent("LiAn-Visual-Agent/0.1 (contact: trankimquang1603@gmail.com)")
 
-_wikipedia_wrapper = WikipediaAPIWrapper(
-    top_k_results=2,
-    doc_content_chars_max=2000,
-)
 wikipedia = WikipediaQueryRun(
-    api_wrapper=_wikipedia_wrapper,
+    api_wrapper=WikipediaAPIWrapper(top_k_results=2, doc_content_chars_max=2000),
     description="Search Wikipedia for factual information. Input should be a search query.",
 )

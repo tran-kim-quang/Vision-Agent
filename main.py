@@ -1,4 +1,7 @@
-from helper.inference_agent import run_supervisor
+from utils.inference import run_supervisor
 
-messages = run_supervisor("Buc anh nay noi ve gi, tim kiem cac thong tin lien quan den noi dung buc anh nay: /home/meocon/work/Visual-Agent/image.png")
-print(messages)
+if __name__ == "__main__":
+    messages = run_supervisor(
+        "What is this image about? Find related information: assets/image.png"
+    )
+    print(messages)

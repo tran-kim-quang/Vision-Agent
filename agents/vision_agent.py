@@ -1,9 +1,10 @@
 import os
 
-from .module.import_deps import *
-from .tools_vision.tools_vs_agent import image_describer_tool
-from .tools_vision.object_detection import detect_and_count_tool
-from pretty_print.pretty_print import pretty_print_messages
+from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
+
+from tools.vision.describe_tool import image_describer_tool
+from tools.vision.detect_tool import detect_and_count_tool
 
 _OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 
@@ -24,10 +25,3 @@ vision_agent = create_react_agent(
     ),
     name="vision_agent",
 )
-
-# config = {"recursion_limit": 50}
-# for chunk in vision_agent.stream(
-#     {"messages": [{"role": "user", "content": "how many person in image: /home/meocon/work/Visual-Agent/663194457_122119841253180261_8059969371422744300_n.jpg"}]},
-#     config=config,
-# ):
-#     pretty_print_messages(chunk)

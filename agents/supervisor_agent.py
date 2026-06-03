@@ -1,10 +1,10 @@
 import os
 
-from langgraph_supervisor import create_supervisor
 from langchain.chat_models import init_chat_model
+from langgraph_supervisor import create_supervisor
 
-from .vision_agent import vision_agent
-from .research_agent import research_agent
+from agents.research_agent import research_agent
+from agents.vision_agent import vision_agent
 
 _OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 
@@ -29,10 +29,9 @@ supervisor = create_supervisor(
         "- Always follow the instructions above\n"
         "- Never make up information or guess\n"
         "- Do NOT perform any tasks yourself, always delegate to the appropriate agent\n"
-        "- If you are unsure, ask the user for clarification\n"
-        "- If the user's request is unclear, ask the user a short clarification question before choosing an agent.\n"
-        "- Respond in the same language as the user."
+        "- If the user's request is unclear, ask a short clarification question before choosing an agent\n"
+        "- Respond in the same language as the user"
     ),
     add_handoff_back_messages=True,
-    output_mode="full_history"
+    output_mode="full_history",
 ).compile()

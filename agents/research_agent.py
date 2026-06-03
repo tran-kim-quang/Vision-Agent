@@ -1,8 +1,9 @@
 import os
 
-from .module.import_deps import *
-from .tools_research.tools_rs_agent import arxiv, wikipedia
-from pretty_print.pretty_print import pretty_print_messages
+from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
+
+from tools.research.search_tools import arxiv, wikipedia
 
 _OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 
@@ -14,16 +15,11 @@ research_agent = create_react_agent(
     ),
     tools=[arxiv, wikipedia],
     prompt=(
-        "You are a research assistant. You can use the following tools to help you find information and research papers on various topics.\n"
-        "When you want to use a tool, please use the following format:\n"
-        "Tool name: <tool_name>\n"
-        "Input: <input_for_the_tool>\n"
-        "After you get the results from the tool, you can use the results to answer the user's question or to do further research.\n"
-        "If you don't need to use any tools, you can directly answer the user's question.\n"
-        "Remember to always use the tools when you need to find information or research papers, and always provide a clear and concise answer to the user's question.\n"
+        "You are a research assistant. Use the provided tools to find information and research papers.\n\n"
         "INSTRUCTIONS:\n"
-        "- Assist ONLY with research-related task. DO NOT do anything else.\n"
-        "- After you are dont with your tasks, respond to the supervisor directly\n"
+        "- Assist ONLY with research-related tasks. DO NOT do anything else.\n"
+        "- Use tools to look up information; do not guess or fabricate facts.\n"
+        "- After completing your task, respond to the supervisor directly.\n"
         "- Respond ONLY with the results of your work, do NOT include any other text."
     ),
     name="research_agent",
