@@ -19,9 +19,6 @@ prompt = ChatPromptTemplate.from_template(
 ).partial(format_instructions=parser.get_format_instructions())
 
 extractor_chain = prompt | llm | parser
-output = extractor_chain.invoke(
-    {"input": "Please analyze the image at https://example.com/image.jpg and provide insights."}
-)
 
 # Function to encode image to base64 string
 def encode_img(image_path: str, get_mime_type: bool = False):

@@ -1,12 +1,16 @@
+import os
+
 from .module.import_deps import *
 from .tools_vision.tools_vs_agent import image_describer_tool
 from .tools_vision.object_detection import detect_and_count_tool
 from pretty_print.pretty_print import pretty_print_messages
 
+_OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+
 vision_agent = create_react_agent(
     model=ChatOpenAI(
         model="gemma4:31b-cloud",
-        base_url="http://localhost:11434/v1",
+        base_url=_OLLAMA_BASE_URL,
         api_key="ollama",
     ),
     tools=[image_describer_tool, detect_and_count_tool],

@@ -1,28 +1,58 @@
-from ..module.import_deps import *
+import time
+
+import arxiv as _arxiv
 import wikipedia as _wiki_pkg
+from langchain_core.tools import tool
 
-# print(llm.invoke("Hello").content)
+from ..module.import_deps import WikipediaAPIWrapper, WikipediaQueryRun
 
-arxiv_wrapper = ArxivAPIWrapper(
-    top_k_results=2,
-    doc_content_chars_max=1000,
-)
 
-arxiv = ArxivQueryRun(
-    api_wrapper=arxiv_wrapper,
-    description="Useful for searching for research papers on arXiv. Input should be a search query, and the output will be a list of relevant papers with their titles, authors, and summaries.",
-)
-# print(arxiv.invoke("deep learning for computer vision"))
+# ── arXiv: custom tool to keep max_results low and retry on 429 ──────────────
+_arxiv_client = _arxiv.Client()
 
-# Wikipedia search
+
+@tool
+def arxiv(query: str) -> str:
+    """Search for research papers on arXiv. Input should be a plain-text search query."""
+    search = _arxiv.Search(
+        query=query,
+        max_results=5,
+        sort_by=_arxiv.SortCriterion.Relevance,
+    )
+    for attempt in range(3):
+        try:
+            results = list(_arxiv_client.results(search))
+            if not results:
+                return "No papers found for that query."
+            parts = []
+            for r in results[:2]:
+                authors = ", ".join(str(a) for a in r.authors[:3])
+                parts.append(
+                    f"Title: {r.title}\n"
+                    f"Authors: {authors}\n"
+                    f"Summary: {r.summary[:600]}\n"
+                    f"URL: {r.entry_id}"
+                )
+            return "\n\n---\n\n".join(parts)
+        except Exception as exc:
+            msg = str(exc)
+            if "429" in msg or "Too Many Requests" in msg.lower():
+                if attempt < 2:
+                    time.sleep(12 * (attempt + 1))
+                    continue
+                return "arXiv rate-limited after retries. Please try again later."
+            return f"arXiv error: {msg}"
+    return "arXiv search failed."
+
+
+# ── Wikipedia ─────────────────────────────────────────────────────────────────
 _wiki_pkg.set_user_agent("LiAn-Visual-Agent/0.1 (contact: trankimquang1603@gmail.com)")
 
-wikipedia_wrapper = WikipediaAPIWrapper(
+_wikipedia_wrapper = WikipediaAPIWrapper(
     top_k_results=2,
     doc_content_chars_max=2000,
 )
 wikipedia = WikipediaQueryRun(
-    api_wrapper=wikipedia_wrapper,
-    description="Useful for searching for information on Wikipedia. Input should be a search query, and the output will be a list of relevant Wikipedia articles with their titles and summaries.",
+    api_wrapper=_wikipedia_wrapper,
+    description="Search Wikipedia for factual information. Input should be a search query.",
 )
-# print(wikipedia.invoke("Artificial Intelligence"))

@@ -1,8 +1,7 @@
 from ..module.import_deps import *
 from typing import Annotated
+from functools import lru_cache
 from langchain.output_parsers import PydanticOutputParser
-
-import cv2
 
 llm = ChatOpenAI(
     model="gemma4:31b-cloud",
@@ -10,7 +9,12 @@ llm = ChatOpenAI(
     api_key="ollama",
 )
 
-yolo_model = YOLO("yolo11x.pt")
+
+@lru_cache(maxsize=1)
+def get_yolo_model():
+    from ultralytics import YOLO
+
+    return YOLO("yolo11x.pt")
 
 # path = "/home/meocon/work/Visual-Agent/663194457_122119841253180261_8059969371422744300_n.jpg"
 # result = yolo_model(path)
@@ -53,6 +57,7 @@ def detect_and_count_tool(
         return "No image path found in the input."
     
     try:
+        yolo_model = get_yolo_model()
         results = yolo_model(image_path, verbose=False)
     except Exception as e:
         return f"Failed to perform object detection: {e}"

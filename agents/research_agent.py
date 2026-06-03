@@ -1,15 +1,19 @@
+import os
+
 from .module.import_deps import *
 from .tools_research.tools_rs_agent import arxiv, wikipedia
 from pretty_print.pretty_print import pretty_print_messages
 
+_OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+
 research_agent = create_react_agent(
-    model = ChatOpenAI(
+    model=ChatOpenAI(
         model="gpt-oss:120b-cloud",
-        base_url="http://localhost:11434/v1",
+        base_url=_OLLAMA_BASE_URL,
         api_key="ollama",
     ),
-    tools = [arxiv, wikipedia],
-    prompt = (
+    tools=[arxiv, wikipedia],
+    prompt=(
         "You are a research assistant. You can use the following tools to help you find information and research papers on various topics.\n"
         "When you want to use a tool, please use the following format:\n"
         "Tool name: <tool_name>\n"
@@ -24,9 +28,3 @@ research_agent = create_react_agent(
     ),
     name="research_agent",
 )
-# config = {"recursion_limit": 50}
-# for chunk in research_agent.stream(
-#     {"messages": [{"role": "user", "content": "Machine Learning"}]},
-#     config=config,
-# ):
-#     pretty_print_messages(chunk)

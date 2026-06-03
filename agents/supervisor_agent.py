@@ -1,14 +1,18 @@
+import os
+
 from langgraph_supervisor import create_supervisor
 from langchain.chat_models import init_chat_model
 
 from .vision_agent import vision_agent
 from .research_agent import research_agent
 
+_OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+
 supervisor = create_supervisor(
     model=init_chat_model(
         model="kimi-k2.5:cloud",
         model_provider="openai",
-        base_url="http://localhost:11434/v1",
+        base_url=_OLLAMA_BASE_URL,
         api_key="ollama",
     ),
     agents=[research_agent, vision_agent],

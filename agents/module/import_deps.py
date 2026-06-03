@@ -32,5 +32,3 @@ from langchain_core.callbacks import (
 )
 from langchain_core.tools import BaseTool, ToolException, tool
 from langchain_core.tools.base import ArgsSchema
-
-from ultralytics import YOLO
