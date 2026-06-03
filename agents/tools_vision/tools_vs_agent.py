@@ -134,4 +134,4 @@ class ImageDescriberTool(BaseTool):
         return self._run(text, run_manager=run_manager)
 
 image_describer_tool = ImageDescriberTool()
-print(image_describer_tool.invoke('/home/meocon/work/Visual-Agent/663194457_122119841253180261_8059969371422744300_n.jpg'))
+# print(image_describer_tool.invoke('/home/meocon/work/Visual-Agent/663194457_122119841253180261_8059969371422744300_n.jpg'))

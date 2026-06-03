@@ -12,7 +12,7 @@ llm = ChatOpenAI(
 
 yolo_model = YOLO("yolo11x.pt")
 
-path = "/home/meocon/work/Visual-Agent/663194457_122119841253180261_8059969371422744300_n.jpg"
+# path = "/home/meocon/work/Visual-Agent/663194457_122119841253180261_8059969371422744300_n.jpg"
 # result = yolo_model(path)
 
 # annotated_bgr = result[0].plot()
@@ -75,4 +75,4 @@ def detect_and_count_tool(
         "detections": detections
     }
 
-print(detect_and_count_tool.invoke(path))
+# print(detect_and_count_tool.invoke(path))

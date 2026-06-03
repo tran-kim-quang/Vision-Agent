@@ -1,6 +1,7 @@
 from .module.import_deps import *
 from .tools_research.tools_rs_agent import arxiv, wikipedia
 from pretty_print.pretty_print import pretty_print_messages
+
 research_agent = create_react_agent(
     model = ChatOpenAI(
         model="gpt-oss:120b-cloud",
@@ -23,9 +24,9 @@ research_agent = create_react_agent(
     ),
     name="research_agent",
 )
-config = {"recursion_limit": 50}
-for chunk in research_agent.stream(
-    {"messages": [{"role": "user", "content": "Machine Learning"}]},
-    config=config,
-):
-    pretty_print_messages(chunk)
+# config = {"recursion_limit": 50}
+# for chunk in research_agent.stream(
+#     {"messages": [{"role": "user", "content": "Machine Learning"}]},
+#     config=config,
+# ):
+#     pretty_print_messages(chunk)
