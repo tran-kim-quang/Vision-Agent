@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, Component } from 'react'
 import ReactMarkdown from 'react-markdown'
+import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
 
 const AGENT_META = {
   supervisor:     { icon: '🎯', label: 'Supervisor',      color: '#818cf8' },
@@ -22,12 +24,48 @@ function genSessionId() {
     : Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
+// ── Error boundary — prevents a broken KaTeX formula from crashing the app ──
+class MarkdownErrorBoundary extends Component {
+  state = { crashed: false }
+  static getDerivedStateFromError() { return { crashed: true } }
+  componentDidCatch(err) { console.warn('[markdown]', err.message) }
+  render() {
+    if (this.state.crashed) {
+      // Reset on next content change so fixed text re-renders correctly
+      return <span style={{ whiteSpace: 'pre-wrap' }}>{this.props.children}</span>
+    }
+    return this.props.children
+  }
+}
+
+// Full markdown with math (for committed, complete messages)
+function MarkdownContent({ children }) {
+  return (
+    <MarkdownErrorBoundary key={children}>
+      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+        {children}
+      </ReactMarkdown>
+    </MarkdownErrorBoundary>
+  )
+}
+
+// Plain GFM only — used while streaming to avoid KaTeX crashing on partial LaTeX
+function MarkdownStream({ children }) {
+  return (
+    <MarkdownErrorBoundary key={children}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        {children}
+      </ReactMarkdown>
+    </MarkdownErrorBoundary>
+  )
+}
+
 // ── Agent card section ─────────────────────────────────────────────────────
 function Section({ section }) {
   if (section.type === 'text') {
     return (
       <div className="sec-text">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{section.content}</ReactMarkdown>
+        <MarkdownContent>{section.content}</MarkdownContent>
       </div>
     )
   }
@@ -71,25 +109,65 @@ function AgentCard({ name, sections, isActive }) {
   )
 }
 
+// ── Lightbox ───────────────────────────────────────────────────────────────
+function Lightbox({ src, onClose }) {
+  const [scale, setScale] = useState(1)
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const onWheel = (e) => {
+    e.preventDefault()
+    setScale(prev => Math.min(Math.max(prev - e.deltaY * 0.001, 0.3), 6))
+  }
+
+  return (
+    <div className="lb-overlay" onClick={onClose} onWheel={onWheel}>
+      <img
+        src={src}
+        alt="full size"
+        className="lb-img"
+        style={{ transform: `scale(${scale})` }}
+        onClick={e => e.stopPropagation()}
+        draggable={false}
+      />
+      <button className="lb-close" onClick={onClose} title="Close (Esc)">✕</button>
+      <span className="lb-hint">Scroll to zoom · right-click to copy/save · Esc to close</span>
+    </div>
+  )
+}
+
 // ── Chat message bubble ────────────────────────────────────────────────────
 function ChatMessage({ msg }) {
   const isUser = msg.role === 'user'
+  const [lightbox, setLightbox] = useState(false)
+
   return (
     <div className={`chat-msg ${isUser ? 'user' : 'assistant'}`}>
       <div className="chat-avatar">{isUser ? '🧑' : '🤖'}</div>
       <div className="chat-bubble">
         {msg.imagePreview && (
-          <img src={msg.imagePreview} alt="attached" className="chat-img-preview" />
+          <img
+            src={msg.imagePreview}
+            alt="attached"
+            className="chat-img-preview"
+            onClick={() => setLightbox(true)}
+            title="Click to view full size"
+          />
         )}
         {isUser
           ? <p className="chat-text-user">{msg.text}</p>
           : (
             <div className="response-markdown">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+              <MarkdownContent>{msg.text}</MarkdownContent>
             </div>
           )
         }
       </div>
+      {lightbox && <Lightbox src={msg.imagePreview} onClose={() => setLightbox(false)} />}
     </div>
   )
 }
@@ -123,6 +201,9 @@ export default function App() {
   const chatEndRef = useRef(null)
   const fileInputRef = useRef(null)
   const agentTextAccumRef = useRef({})
+  // Mirror of streamingText in a ref so the 'done' handler can read the
+  // current value synchronously without calling setState inside a setState updater.
+  const streamingTextRef = useRef('')
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -146,8 +227,15 @@ export default function App() {
     }
   }, [])
 
+  // Called by the × button — revokes the blob URL to free memory
   const removeImage = useCallback(() => {
     setAttachedImage(prev => { if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl); return null })
+  }, [])
+
+  // Called on submit — clears the attachment WITHOUT revoking the blob URL
+  // so the URL stored in chatHistory remains valid for display
+  const clearImageAfterSend = useCallback(() => {
+    setAttachedImage(null)
   }, [])
 
   const handleFileChange = (e) => {
@@ -195,8 +283,12 @@ export default function App() {
         setAgentData(prev => ({ ...prev, [event.agent]: prev[event.agent] ?? { sections: [], isActive: true } }))
         break
       case 'token':
-        if (event.agent === 'supervisor') setStreamingText(prev => prev + event.content)
-        else pushSection(event.agent, { type: 'text', content: event.content })
+        if (event.agent === 'supervisor') {
+          streamingTextRef.current += event.content
+          setStreamingText(prev => prev + event.content)
+        } else {
+          pushSection(event.agent, { type: 'text', content: event.content })
+        }
         break
       case 'tool_call':
         pushSection(event.agent, { type: 'tool_call', tool: event.tool, args: event.args })
@@ -204,7 +296,14 @@ export default function App() {
       case 'tool_result':
         pushSection(event.agent, { type: 'tool_result', tool: event.tool, content: event.content })
         break
-      case 'handoff': break
+      case 'handoff':
+        // Only clear when the supervisor routes OUT to a sub-agent (transfer_to_X).
+        // Do NOT clear on the return trip (transfer_back_to_supervisor).
+        if (!event.tool?.toLowerCase().includes('back')) {
+          streamingTextRef.current = ''
+          setStreamingText('')
+        }
+        break
       case 'error':
         setErrorMsg(event.content)
         break
@@ -215,26 +314,29 @@ export default function App() {
           for (const [k, v] of Object.entries(prev)) next[k] = { ...v, isActive: false }
           return next
         })
-        // Get final text — either supervisor's own or fallback to last agent
-        setStreamingText(prev => {
-          let final = prev
-          if (!final.trim() && !event.supervisor_responded) {
-            const accum = agentTextAccumRef.current
-            for (const name of ['agent', 'research_agent', 'vision_agent']) {
-              if (accum[name]?.trim()) { final = accum[name]; break }
-            }
-            if (!final.trim()) {
-              for (const [name, text] of Object.entries(accum)) {
-                if (name !== 'tools' && text?.trim()) { final = text; break }
-              }
+
+        // Read current streaming text from the ref (synchronous, no stale closure)
+        let final = streamingTextRef.current
+        if (!final.trim() && !event.supervisor_responded) {
+          const accum = agentTextAccumRef.current
+          for (const name of ['agent', 'research_agent', 'vision_agent']) {
+            if (accum[name]?.trim()) { final = accum[name]; break }
+          }
+          if (!final.trim()) {
+            for (const [name, text] of Object.entries(accum)) {
+              if (name !== 'tools' && text?.trim()) { final = text; break }
             }
           }
-          // Commit final text to chat history
-          if (final.trim()) {
-            setChatHistory(h => [...h, { role: 'assistant', text: final }])
-          }
-          return ''  // clear streaming buffer
-        })
+        }
+
+        // Commit to chat history and clear display — separate setState calls,
+        // never nested inside each other (calling setState inside a setState
+        // updater is a React anti-pattern that silently drops the inner update).
+        if (final.trim()) {
+          setChatHistory(h => [...h, { role: 'assistant', text: final }])
+        }
+        streamingTextRef.current = ''
+        setStreamingText('')
         break
       }
       default: break
@@ -258,11 +360,12 @@ export default function App() {
       imagePreview: attachedImage?.previewUrl,
     }])
     setInput('')
-    removeImage()
+    clearImageAfterSend()  // don't revoke — URL is now owned by chatHistory
 
     // Reset agent activity for this turn
     setAgentData({})
     setAgentOrder([])
+    streamingTextRef.current = ''
     setStreamingText('')
     setErrorMsg('')
     setIsStreaming(true)
@@ -386,7 +489,7 @@ export default function App() {
                   {streamingText
                     ? (
                       <div className="response-markdown">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
+                        <MarkdownStream>{streamingText}</MarkdownStream>
                         {isStreaming && <span className="cursor">▊</span>}
                       </div>
                     )

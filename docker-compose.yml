@@ -16,6 +16,7 @@ services:
     environment:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_DOCKER:-http://host.docker.internal:11434/v1}
       REDIS_URL: redis://redis:6379
+      DEBUG_STREAM: "false"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

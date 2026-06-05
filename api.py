@@ -17,9 +17,15 @@ from pydantic import BaseModel
 
 from agents.supervisor_agent import build_supervisor
 
-_REDIS_URL   = os.getenv("REDIS_URL", "")
-_UPLOAD_DIR  = Path("assets/uploads")
+_REDIS_URL    = os.getenv("REDIS_URL", "")
+_DEBUG        = os.getenv("DEBUG_STREAM", "false").lower() == "true"
+_UPLOAD_DIR   = Path("assets/uploads")
 _ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+
+
+def _dbg(*args):
+    if _DEBUG:
+        print("[DBG]", *args, flush=True)
 
 
 # ── Startup / shutdown ─────────────────────────────────────────────────────────
@@ -30,24 +36,23 @@ async def lifespan(app: FastAPI):
     if _REDIS_URL:
         try:
             from langgraph.checkpoint.redis.aio import AsyncRedisSaver
-            checkpointer = AsyncRedisSaver.from_conn_string(_REDIS_URL)
-            await checkpointer.setup()
-            print(f"[memory] Redis checkpointer connected → {_REDIS_URL}")
+            # from_conn_string returns an async context manager — use it correctly
+            async with AsyncRedisSaver.from_conn_string(_REDIS_URL) as cp:
+                await cp.setup()
+                print(f"[memory] Redis connected → {_REDIS_URL}", flush=True)
+                app.state.supervisor    = build_supervisor(checkpointer=cp)
+                app.state.checkpointer  = cp
+                yield   # server runs here, inside the async context
+            return      # skip MemorySaver fallback below
         except Exception as exc:
-            print(f"[memory] Redis unavailable ({exc}), falling back to MemorySaver")
-            checkpointer = None
+            print(f"[memory] Redis unavailable ({exc}), falling back to MemorySaver", flush=True)
 
-    if checkpointer is None:
-        from langgraph.checkpoint.memory import MemorySaver
-        checkpointer = MemorySaver()
-        print("[memory] Using in-memory checkpointer (sessions lost on restart)")
-
-    app.state.supervisor = build_supervisor(checkpointer=checkpointer)
+    from langgraph.checkpoint.memory import MemorySaver
+    checkpointer = MemorySaver()
+    print("[memory] Using in-memory checkpointer (sessions lost on restart)", flush=True)
+    app.state.supervisor   = build_supervisor(checkpointer=checkpointer)
     app.state.checkpointer = checkpointer
     yield
-
-    if hasattr(checkpointer, "aclose"):
-        await checkpointer.aclose()
 
 
 app = FastAPI(title="Visual Agent API", lifespan=lifespan)
@@ -106,6 +111,7 @@ async def event_stream(message: str, session_id: str, supervisor):
             config=config,
             stream_mode=["messages", "updates"],
         ):
+            # Detect format: multi-mode → (mode_str, payload) or legacy raw types
             if isinstance(raw, tuple) and len(raw) == 2 and isinstance(raw[0], str):
                 mode, payload = raw
             elif isinstance(raw, tuple) and len(raw) == 2:
@@ -113,50 +119,78 @@ async def event_stream(message: str, session_id: str, supervisor):
             elif isinstance(raw, dict):
                 mode, payload = "updates", raw
             else:
+                _dbg(f"unknown raw type: {type(raw)}")
                 continue
 
+            _dbg(f"mode={mode!r}")
+
+            # ── Token streaming ────────────────────────────────────────────
             if mode == "messages":
                 chunk, metadata = payload
                 agent = _effective_agent(metadata)
+                node  = metadata.get("langgraph_node", "?")
+                ns    = metadata.get("langgraph_checkpoint_ns", "")
+                _dbg(f"  messages | node={node!r} ns={ns!r} agent={agent!r} type={type(chunk).__name__}")
+
                 start = _start(agent)
                 if start:
                     yield start
 
                 if isinstance(chunk, ToolMessage):
                     tool_name = chunk.name or ""
+                    _dbg(f"  ToolMessage tool={tool_name!r} content={str(chunk.content)[:80]!r}")
                     if "transfer" in tool_name.lower():
+                        if "back" not in tool_name.lower():
+                            # Routing to a sub-agent — reset flag so updates fallback can run later
+                            supervisor_text_sent = False
+                            _dbg("  → supervisor_text_sent reset to False")
                         yield f"data: {json.dumps({'type': 'handoff', 'agent': agent, 'tool': tool_name})}\n\n"
                     else:
                         yield f"data: {json.dumps({'type': 'tool_result', 'agent': agent, 'tool': tool_name, 'content': str(chunk.content)[:1000]})}\n\n"
 
                 elif isinstance(chunk, AIMessageChunk):
                     text = _extract_text(chunk.content)
+                    tcs  = [tc.get("name") for tc in (chunk.tool_call_chunks or []) if tc.get("name")]
+                    _dbg(f"  AIMessageChunk text={text[:60]!r} tool_calls={tcs}")
+
                     if text:
                         if agent == "supervisor":
                             supervisor_text_sent = True
                         yield f"data: {json.dumps({'type': 'token', 'agent': agent, 'content': text})}\n\n"
+
                     for tc in (chunk.tool_call_chunks or []):
                         if tc.get("name") and "transfer" not in tc["name"].lower():
                             yield f"data: {json.dumps({'type': 'tool_call', 'agent': agent, 'tool': tc['name'], 'args': str(tc.get('args', ''))})}\n\n"
 
-            elif mode == "updates" and not supervisor_text_sent:
-                for node, state in (payload or {}).items():
-                    if node != "supervisor" or not isinstance(state, dict):
-                        continue
-                    for msg in reversed(state.get("messages", [])):
-                        text = _extract_text(getattr(msg, "content", ""))
-                        has_tool_calls = bool(getattr(msg, "tool_calls", None))
-                        if text and not has_tool_calls:
-                            supervisor_text_sent = True
-                            start = _start("supervisor")
-                            if start:
-                                yield start
-                            yield f"data: {json.dumps({'type': 'token', 'agent': 'supervisor', 'content': text})}\n\n"
-                            break
+            # ── State updates — supervisor fallback ────────────────────────
+            elif mode == "updates":
+                nodes = list(payload.keys()) if isinstance(payload, dict) else []
+                _dbg(f"  updates | nodes={nodes} supervisor_text_sent={supervisor_text_sent}")
+
+                if not supervisor_text_sent:
+                    for node, state in (payload or {}).items():
+                        if node != "supervisor" or not isinstance(state, dict):
+                            continue
+                        msgs = state.get("messages", [])
+                        _dbg(f"  supervisor update: {len(msgs)} messages")
+                        for msg in reversed(msgs):
+                            text         = _extract_text(getattr(msg, "content", ""))
+                            has_tc       = bool(getattr(msg, "tool_calls", None))
+                            _dbg(f"    msg={type(msg).__name__} has_tc={has_tc} text={text[:60]!r}")
+                            if text and not has_tc:
+                                supervisor_text_sent = True
+                                start = _start("supervisor")
+                                if start:
+                                    yield start
+                                yield f"data: {json.dumps({'type': 'token', 'agent': 'supervisor', 'content': text})}\n\n"
+                                _dbg("  → supervisor final text emitted via updates fallback")
+                                break
 
     except Exception as exc:
+        print(f"[stream error] {exc}", flush=True)
         yield f"data: {json.dumps({'type': 'error', 'content': str(exc)})}\n\n"
 
+    _dbg(f"stream done | supervisor_text_sent={supervisor_text_sent}")
     yield f"data: {json.dumps({'type': 'done', 'supervisor_responded': supervisor_text_sent})}\n\n"
 
 
@@ -189,19 +223,15 @@ async def health(req: Request):
 
 @app.get("/api/history/{session_id}")
 async def get_history(session_id: str, req: Request):
-    """Debug endpoint — shows what messages the agent has stored for a session."""
     config = {"configurable": {"thread_id": session_id}}
     try:
-        state = req.app.state.supervisor.get_state(config)
+        state    = req.app.state.supervisor.get_state(config)
         messages = state.values.get("messages", [])
         return {
             "session_id": session_id,
             "message_count": len(messages),
             "messages": [
-                {
-                    "role": getattr(m, "type", "unknown"),
-                    "preview": str(getattr(m, "content", ""))[:120],
-                }
+                {"role": getattr(m, "type", "?"), "preview": str(getattr(m, "content", ""))[:120]}
                 for m in messages
             ],
         }

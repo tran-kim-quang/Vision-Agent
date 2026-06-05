@@ -1,18 +1,32 @@
 import os
+import re
 from functools import lru_cache
 from typing import Annotated
 
-from langchain.output_parsers import PydanticOutputParser
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 _OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-_OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
-_YOLO_MODEL_PATH = os.getenv("YOLO_MODEL_PATH", "models/yolo11x.pt")
+_OLLAMA_API_KEY  = os.getenv("OLLAMA_API_KEY",  "ollama")
+_YOLO_MODEL_PATH = os.getenv("YOLO_MODEL_PATH",  "models/yolo11x.pt")
 
 _llm = ChatOpenAI(model="gemma4:31b-cloud", base_url=_OLLAMA_BASE_URL, api_key=_OLLAMA_API_KEY)
+
+
+# ── Path extraction (same regex as describe_tool) ─────────────────────────────
+_PATH_PATTERNS = [
+    re.compile(r'Image:\s*(\S+)',                    re.IGNORECASE),
+    re.compile(r'(/[\w/.\-]+\.(?:jpe?g|png|gif|webp|bmp))', re.IGNORECASE),
+    re.compile(r'(https?://\S+\.(?:jpe?g|png|gif|webp|bmp)\S*)', re.IGNORECASE),
+]
+
+def _extract_path(text: str) -> str | None:
+    for pattern in _PATH_PATTERNS:
+        m = pattern.search(text)
+        if m:
+            return m.group(1).strip()
+    return None
 
 
 # ── YOLO model (loaded once) ───────────────────────────────────────────────────
@@ -20,21 +34,6 @@ _llm = ChatOpenAI(model="gemma4:31b-cloud", base_url=_OLLAMA_BASE_URL, api_key=_
 def _get_yolo():
     from ultralytics import YOLO
     return YOLO(_YOLO_MODEL_PATH)
-
-
-# ── Image path extractor ───────────────────────────────────────────────────────
-class _ImageInput(BaseModel):
-    image_path: str = Field(..., description="The path or URL of the image to be processed.")
-
-_parser = PydanticOutputParser(pydantic_object=_ImageInput)
-_extractor = (
-    ChatPromptTemplate.from_template(
-        "Extract the image path or URL from the following input:\n\n"
-        "{input}\n\n{format_instructions}"
-    ).partial(format_instructions=_parser.get_format_instructions())
-    | _llm
-    | _parser
-)
 
 
 # ── Tool ───────────────────────────────────────────────────────────────────────
@@ -47,19 +46,18 @@ def detect_and_count_tool(
     text: Annotated[str, "Text that may contain an image path or URL."]
 ) -> dict | str:
     """Detect and count objects in an image. Returns counts per class and bounding boxes."""
-    try:
-        parsed = _extractor.invoke({"input": text})
-    except Exception as exc:
-        return f"Failed to extract image path: {exc}"
+    image_path = _extract_path(text)
+    if not image_path:
+        return "No image path or URL found in the input."
 
-    if not parsed.image_path:
-        return "No image path found in the input."
+    if not image_path.startswith("http") and not os.path.exists(image_path):
+        return f"Image file not found: {image_path!r}. Please verify the path and try again."
 
     try:
         model = _get_yolo()
-        results = model(parsed.image_path, verbose=False)
+        results = model(image_path, verbose=False)
     except Exception as exc:
-        return f"Failed to perform object detection: {exc}"
+        return f"Object detection failed: {exc}"
 
     detections, counts = [], {}
     for result in results:
