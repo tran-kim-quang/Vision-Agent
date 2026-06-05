@@ -14,7 +14,13 @@ function agentMeta(name) {
   return AGENT_META[name] ?? { icon: '🤖', label: name, color: '#94a3b8' }
 }
 
-// ── Section renderer ───────────────────────────────────────────────────────
+function genSessionId() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2) + Date.now().toString(36)
+}
+
+// ── Agent card section ─────────────────────────────────────────────────────
 function Section({ section }) {
   if (section.type === 'text') {
     return (
@@ -42,15 +48,12 @@ function Section({ section }) {
   return null
 }
 
-// ── Agent card ─────────────────────────────────────────────────────────────
 function AgentCard({ name, sections, isActive }) {
   const bodyRef = useRef(null)
   const meta = agentMeta(name)
-
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
   }, [sections])
-
   return (
     <div className={`agent-card ${isActive ? 'active' : 'done'}`} style={{ '--accent': meta.color }}>
       <div className="agent-card-header">
@@ -66,24 +69,55 @@ function AgentCard({ name, sections, isActive }) {
   )
 }
 
+// ── Chat message bubble ────────────────────────────────────────────────────
+function ChatMessage({ msg }) {
+  const isUser = msg.role === 'user'
+  return (
+    <div className={`chat-msg ${isUser ? 'user' : 'assistant'}`}>
+      <div className="chat-avatar">{isUser ? '🧑' : '🤖'}</div>
+      <div className="chat-bubble">
+        {msg.imagePreview && (
+          <img src={msg.imagePreview} alt="attached" className="chat-img-preview" />
+        )}
+        {isUser
+          ? <p className="chat-text-user">{msg.text}</p>
+          : (
+            <div className="response-markdown">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+            </div>
+          )
+        }
+      </div>
+    </div>
+  )
+}
+
 // ── Main app ───────────────────────────────────────────────────────────────
 export default function App() {
+  const [sessionId] = useState(genSessionId)  // stable for the lifetime of the tab
   const [input, setInput] = useState('')
-  const [attachedImage, setAttachedImage] = useState(null) // { previewUrl, serverPath, name }
+  const [attachedImage, setAttachedImage] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
+
+  // Chat history: { role, text, imagePreview? }
+  const [chatHistory, setChatHistory] = useState([])
+  // Streaming accumulator for the current assistant reply
+  const [streamingText, setStreamingText] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+
+  // Agent activity for the current request
   const [agentData, setAgentData] = useState({})
   const [agentOrder, setAgentOrder] = useState([])
-  const [supervisorText, setSupervisorText] = useState('')
-  const [isStreaming, setIsStreaming] = useState(false)
+
   const [errorMsg, setErrorMsg] = useState('')
 
-  const supervisorRef = useRef(null)
+  const chatEndRef = useRef(null)
   const fileInputRef = useRef(null)
   const agentTextAccumRef = useRef({})
 
   useEffect(() => {
-    if (supervisorRef.current) supervisorRef.current.scrollTop = supervisorRef.current.scrollHeight
-  }, [supervisorText])
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatHistory, streamingText])
 
   // ── Image upload ───────────────────────────────────────────────────────────
   const uploadFile = useCallback(async (file) => {
@@ -95,11 +129,7 @@ export default function App() {
       const res = await fetch('/api/upload', { method: 'POST', body: form })
       if (!res.ok) throw new Error(`Upload failed (${res.status})`)
       const { path } = await res.json()
-      setAttachedImage({
-        previewUrl: URL.createObjectURL(file),
-        serverPath: path,
-        name: file.name || 'image',
-      })
+      setAttachedImage({ previewUrl: URL.createObjectURL(file), serverPath: path, name: file.name || 'image' })
     } catch (err) {
       setErrorMsg(err.message)
     } finally {
@@ -108,10 +138,7 @@ export default function App() {
   }, [])
 
   const removeImage = useCallback(() => {
-    setAttachedImage(prev => {
-      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl)
-      return null
-    })
+    setAttachedImage(prev => { if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl); return null })
   }, [])
 
   const handleFileChange = (e) => {
@@ -122,11 +149,7 @@ export default function App() {
 
   const handlePaste = useCallback((e) => {
     for (const item of e.clipboardData?.items ?? []) {
-      if (item.type.startsWith('image/')) {
-        e.preventDefault()
-        uploadFile(item.getAsFile())
-        break
-      }
+      if (item.type.startsWith('image/')) { e.preventDefault(); uploadFile(item.getAsFile()); break }
     }
   }, [uploadFile])
 
@@ -136,11 +159,10 @@ export default function App() {
     if (file?.type.startsWith('image/')) uploadFile(file)
   }, [uploadFile])
 
-  // ── Agent sections ─────────────────────────────────────────────────────────
+  // ── Agent section helpers ──────────────────────────────────────────────────
   const pushSection = useCallback((agentName, section) => {
     if (section.type === 'text') {
-      agentTextAccumRef.current[agentName] =
-        (agentTextAccumRef.current[agentName] ?? '') + section.content
+      agentTextAccumRef.current[agentName] = (agentTextAccumRef.current[agentName] ?? '') + section.content
     }
     setAgentData(prev => {
       const agent = prev[agentName] ?? { sections: [], isActive: true }
@@ -156,7 +178,7 @@ export default function App() {
     })
   }, [])
 
-  // ── SSE event handler ──────────────────────────────────────────────────────
+  // ── SSE handler ────────────────────────────────────────────────────────────
   const handleEvent = useCallback((event) => {
     switch (event.type) {
       case 'agent_start':
@@ -164,7 +186,7 @@ export default function App() {
         setAgentData(prev => ({ ...prev, [event.agent]: prev[event.agent] ?? { sections: [], isActive: true } }))
         break
       case 'token':
-        if (event.agent === 'supervisor') setSupervisorText(prev => prev + event.content)
+        if (event.agent === 'supervisor') setStreamingText(prev => prev + event.content)
         else pushSection(event.agent, { type: 'text', content: event.content })
         break
       case 'tool_call':
@@ -173,33 +195,40 @@ export default function App() {
       case 'tool_result':
         pushSection(event.agent, { type: 'tool_result', tool: event.tool, content: event.content })
         break
-      case 'handoff':
-        break
+      case 'handoff': break
       case 'error':
         setErrorMsg(event.content)
         break
-      case 'done':
+      case 'done': {
+        // Mark all agents done
         setAgentData(prev => {
           const next = {}
           for (const [k, v] of Object.entries(prev)) next[k] = { ...v, isActive: false }
           return next
         })
-        if (!event.supervisor_responded) {
-          setSupervisorText(prev => {
-            if (prev.trim()) return prev
+        // Get final text — either supervisor's own or fallback to last agent
+        setStreamingText(prev => {
+          let final = prev
+          if (!final.trim() && !event.supervisor_responded) {
             const accum = agentTextAccumRef.current
             for (const name of ['agent', 'research_agent', 'vision_agent']) {
-              if (accum[name]?.trim()) return accum[name]
+              if (accum[name]?.trim()) { final = accum[name]; break }
             }
-            for (const [name, text] of Object.entries(accum)) {
-              if (name !== 'tools' && text?.trim()) return text
+            if (!final.trim()) {
+              for (const [name, text] of Object.entries(accum)) {
+                if (name !== 'tools' && text?.trim()) { final = text; break }
+              }
             }
-            return prev
-          })
-        }
+          }
+          // Commit final text to chat history
+          if (final.trim()) {
+            setChatHistory(h => [...h, { role: 'assistant', text: final }])
+          }
+          return ''  // clear streaming buffer
+        })
         break
-      default:
-        break
+      }
+      default: break
     }
   }, [pushSection])
 
@@ -208,27 +237,33 @@ export default function App() {
     const hasContent = input.trim() || attachedImage
     if (!hasContent || isStreaming || isUploading) return
 
-    // Build final message — append image path so agents can find it
     let message = input.trim()
     if (attachedImage) {
-      message = message
-        ? `${message}\n\nImage: ${attachedImage.serverPath}`
-        : `Image: ${attachedImage.serverPath}`
+      message = message ? `${message}\n\nImage: ${attachedImage.serverPath}` : `Image: ${attachedImage.serverPath}`
     }
 
+    // Add user message to history
+    setChatHistory(h => [...h, {
+      role: 'user',
+      text: input.trim() || '(image)',
+      imagePreview: attachedImage?.previewUrl,
+    }])
+    setInput('')
+    removeImage()
+
+    // Reset agent activity for this turn
     setAgentData({})
     setAgentOrder([])
-    setSupervisorText('')
+    setStreamingText('')
     setErrorMsg('')
     setIsStreaming(true)
     agentTextAccumRef.current = {}
-    removeImage()
 
     try {
       const response = await fetch('/api/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, session_id: sessionId }),
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
@@ -258,6 +293,18 @@ export default function App() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit() }
   }
 
+  const newChat = () => {
+    setChatHistory([])
+    setAgentData({})
+    setAgentOrder([])
+    setStreamingText('')
+    setErrorMsg('')
+    // Session ID stays the same so MemorySaver still has history on the server,
+    // but the UI is cleared for a fresh visual start.
+    // To also clear server-side history, generate a new session:
+    // window.location.reload()
+  }
+
   const subAgents = agentOrder.filter(n => n !== 'supervisor')
   const canSend = (input.trim() || attachedImage) && !isStreaming && !isUploading
 
@@ -270,16 +317,23 @@ export default function App() {
           <span className="brand-icon">🤖</span>
           <span className="brand-name">Visual Agent System</span>
         </div>
-        {isStreaming && (
-          <div className="streaming-indicator">
-            <span className="dot-pulse" />
-            <span>Streaming</span>
-          </div>
-        )}
+        <div className="topbar-right">
+          {isStreaming && (
+            <div className="streaming-indicator">
+              <span className="dot-pulse" />
+              <span>Streaming</span>
+            </div>
+          )}
+          <button className="new-chat-btn" onClick={newChat} title="New chat">
+            ✏️ New chat
+          </button>
+        </div>
       </header>
 
       {/* Panels */}
       <div className="panels">
+
+        {/* Left — Agent Activity */}
         <section className="panel panel-agents">
           <div className="panel-title">
             <span>Agent Activity</span>
@@ -287,7 +341,7 @@ export default function App() {
           </div>
           <div className="panel-body">
             {subAgents.length === 0
-              ? <p className="empty">Sub-agent activity will stream here…</p>
+              ? <p className="empty">Agent activity streams here during inference…</p>
               : subAgents.map(name => (
                   <AgentCard key={name} name={name}
                     sections={agentData[name]?.sections ?? []}
@@ -297,25 +351,43 @@ export default function App() {
           </div>
         </section>
 
-        <section className="panel panel-response">
+        {/* Right — Chat thread */}
+        <section className="panel panel-chat">
           <div className="panel-title">
-            <span>Supervisor Response</span>
-            {agentData['supervisor'] && (
-              <span className={`badge ${agentData['supervisor'].isActive ? 'active-badge' : ''}`}>
-                {agentData['supervisor'].isActive ? 'typing…' : 'done'}
-              </span>
+            <span>Conversation</span>
+            {chatHistory.length > 0 && (
+              <span className="badge">{Math.ceil(chatHistory.length / 2)} turn{chatHistory.length > 2 ? 's' : ''}</span>
             )}
           </div>
-          <div className="panel-body response-body" ref={supervisorRef}>
-            {!supervisorText && !isStreaming
-              ? <p className="empty">The supervisor's final answer will appear here…</p>
-              : (
-                <div className="response-markdown">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{supervisorText}</ReactMarkdown>
-                  {isStreaming && supervisorText && <span className="cursor">▊</span>}
+          <div className="panel-body chat-body">
+            {chatHistory.length === 0 && !streamingText && !isStreaming && (
+              <div className="chat-empty">
+                <span className="chat-empty-icon">💬</span>
+                <p>Start a conversation — ask a research question or attach an image.</p>
+              </div>
+            )}
+
+            {chatHistory.map((msg, i) => <ChatMessage key={i} msg={msg} />)}
+
+            {/* Streaming assistant reply */}
+            {(isStreaming || streamingText) && (
+              <div className="chat-msg assistant">
+                <div className="chat-avatar">🤖</div>
+                <div className="chat-bubble">
+                  {streamingText
+                    ? (
+                      <div className="response-markdown">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
+                        {isStreaming && <span className="cursor">▊</span>}
+                      </div>
+                    )
+                    : <span className="thinking">thinking…</span>
+                  }
                 </div>
-              )
-            }
+              </div>
+            )}
+
+            <div ref={chatEndRef} />
           </div>
         </section>
       </div>
@@ -330,8 +402,6 @@ export default function App() {
 
       {/* Input bar */}
       <footer className="inputbar">
-
-        {/* Image preview strip */}
         {attachedImage && (
           <div className="image-preview-strip">
             <img src={attachedImage.previewUrl} alt="preview" className="preview-thumb" />
@@ -339,69 +409,34 @@ export default function App() {
               <span className="preview-name">{attachedImage.name}</span>
               <span className="preview-hint">will be sent with your message</span>
             </div>
-            <button className="preview-remove" onClick={removeImage} title="Remove image">✕</button>
+            <button className="preview-remove" onClick={removeImage}>✕</button>
           </div>
         )}
-
-        {/* Input row */}
         <div className="input-row">
-
-          {/* Attach button */}
-          <button
-            className="attach-btn"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isStreaming || isUploading}
-            title="Attach image (or paste / drag-and-drop)"
-          >
-            {isUploading
-              ? <span className="spinner small" />
-              : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-              )
-            }
+          <button className="attach-btn" onClick={() => fileInputRef.current?.click()}
+            disabled={isStreaming || isUploading} title="Attach image (or paste / drag-and-drop)">
+            {isUploading ? <span className="spinner small" /> : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            )}
           </button>
-
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleFileChange}
-          />
-
-          {/* Textarea */}
-          <textarea
-            className="input-field"
-            value={input}
+          <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
+          <textarea className="input-field" value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={onKeyDown}
-            onPaste={handlePaste}
-            onDrop={handleDrop}
-            onDragOver={e => e.preventDefault()}
-            placeholder={attachedImage
-              ? 'Add a message or just send the image…'
-              : 'Ask anything… or paste / drag an image here'
-            }
-            rows={2}
-            disabled={isStreaming}
-          />
-
-          {/* Send button */}
+            onKeyDown={onKeyDown} onPaste={handlePaste}
+            onDrop={handleDrop} onDragOver={e => e.preventDefault()}
+            placeholder={attachedImage ? 'Add a message or just send the image…' : 'Ask anything… follow-ups work too'}
+            rows={2} disabled={isStreaming} />
           <button className="send-btn" onClick={handleSubmit} disabled={!canSend}>
-            {isStreaming
-              ? <span className="spinner" />
-              : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              )
-            }
+            {isStreaming ? <span className="spinner" /> : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            )}
           </button>
         </div>
       </footer>

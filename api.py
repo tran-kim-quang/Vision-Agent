@@ -2,24 +2,55 @@ import json
 import os
 import shutil
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, ToolMessage
 from pydantic import BaseModel
 
-_UPLOAD_DIR = Path("assets/uploads")
+from agents.supervisor_agent import build_supervisor
+
+_REDIS_URL   = os.getenv("REDIS_URL", "")
+_UPLOAD_DIR  = Path("assets/uploads")
 _ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
-from agents.supervisor_agent import supervisor
 
-app = FastAPI(title="Visual Agent API")
+# ── Startup / shutdown ─────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    checkpointer = None
+
+    if _REDIS_URL:
+        try:
+            from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+            checkpointer = AsyncRedisSaver.from_conn_string(_REDIS_URL)
+            await checkpointer.setup()
+            print(f"[memory] Redis checkpointer connected → {_REDIS_URL}")
+        except Exception as exc:
+            print(f"[memory] Redis unavailable ({exc}), falling back to MemorySaver")
+            checkpointer = None
+
+    if checkpointer is None:
+        from langgraph.checkpoint.memory import MemorySaver
+        checkpointer = MemorySaver()
+        print("[memory] Using in-memory checkpointer (sessions lost on restart)")
+
+    app.state.supervisor = build_supervisor(checkpointer=checkpointer)
+    app.state.checkpointer = checkpointer
+    yield
+
+    if hasattr(checkpointer, "aclose"):
+        await checkpointer.aclose()
+
+
+app = FastAPI(title="Visual Agent API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,10 +60,13 @@ app.add_middleware(
 )
 
 
+# ── Request model ──────────────────────────────────────────────────────────────
 class InferenceRequest(BaseModel):
     message: str
+    session_id: str = "default"
 
 
+# ── Helpers ────────────────────────────────────────────────────────────────────
 def _effective_agent(metadata: dict) -> str:
     checkpoint_ns: str = metadata.get("langgraph_checkpoint_ns", "")
     if checkpoint_ns:
@@ -51,8 +85,12 @@ def _extract_text(content) -> str:
     return ""
 
 
-async def event_stream(message: str):
-    config = {"recursion_limit": 50}
+# ── SSE stream ─────────────────────────────────────────────────────────────────
+async def event_stream(message: str, session_id: str, supervisor):
+    config = {
+        "recursion_limit": 50,
+        "configurable": {"thread_id": session_id},
+    }
     seen_agents: set[str] = set()
     supervisor_text_sent = False
 
@@ -63,31 +101,23 @@ async def event_stream(message: str):
         return None
 
     try:
-        # Use both modes: messages for token streaming, updates to capture
-        # supervisor's final text when it doesn't stream tokens itself.
         async for raw in supervisor.astream(
             {"messages": [{"role": "user", "content": message}]},
             config=config,
             stream_mode=["messages", "updates"],
         ):
-            # LangGraph wraps multi-mode events as (mode_name, payload).
-            # Be defensive: handle both wrapped and unwrapped formats.
             if isinstance(raw, tuple) and len(raw) == 2 and isinstance(raw[0], str):
                 mode, payload = raw
             elif isinstance(raw, tuple) and len(raw) == 2:
-                # Plain (chunk, metadata) — messages mode without wrapper
                 mode, payload = "messages", raw
             elif isinstance(raw, dict):
-                # Plain update dict
                 mode, payload = "updates", raw
             else:
                 continue
 
-            # ── Token streaming ────────────────────────────────────────
             if mode == "messages":
                 chunk, metadata = payload
                 agent = _effective_agent(metadata)
-
                 start = _start(agent)
                 if start:
                     yield start
@@ -105,12 +135,10 @@ async def event_stream(message: str):
                         if agent == "supervisor":
                             supervisor_text_sent = True
                         yield f"data: {json.dumps({'type': 'token', 'agent': agent, 'content': text})}\n\n"
-
                     for tc in (chunk.tool_call_chunks or []):
                         if tc.get("name") and "transfer" not in tc["name"].lower():
                             yield f"data: {json.dumps({'type': 'tool_call', 'agent': agent, 'tool': tc['name'], 'args': str(tc.get('args', ''))})}\n\n"
 
-            # ── State updates — supervisor fallback ────────────────────
             elif mode == "updates" and not supervisor_text_sent:
                 for node, state in (payload or {}).items():
                     if node != "supervisor" or not isinstance(state, dict):
@@ -129,15 +157,14 @@ async def event_stream(message: str):
     except Exception as exc:
         yield f"data: {json.dumps({'type': 'error', 'content': str(exc)})}\n\n"
 
-    # Tell the frontend whether supervisor produced its own text so it can
-    # decide whether to use the last agent's response as a fallback.
     yield f"data: {json.dumps({'type': 'done', 'supervisor_responded': supervisor_text_sent})}\n\n"
 
 
+# ── Endpoints ──────────────────────────────────────────────────────────────────
 @app.post("/api/stream")
-async def stream_inference(request: InferenceRequest):
+async def stream_inference(request: InferenceRequest, req: Request):
     return StreamingResponse(
-        event_stream(request.message),
+        event_stream(request.message, request.session_id, req.app.state.supervisor),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -156,5 +183,6 @@ async def upload_image(file: UploadFile = File(...)):
 
 
 @app.get("/health")
-async def health():
-    return {"status": "ok"}
+async def health(req: Request):
+    checkpointer_type = type(req.app.state.checkpointer).__name__
+    return {"status": "ok", "memory": checkpointer_type}
