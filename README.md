@@ -278,7 +278,8 @@ trace thực thi LangGraph tại [smith.langchain.com](https://smith.langchain.c
 Dưới đây là video demo ngắn minh họa hệ thống hoạt động (tệp thử nghiệm nằm ở `assets/demo_test.webm`):
 
 <video controls width="640">
-  <source src="assets/demo_test.webm" type="video/webm">
+  <source src="assets/demo_test.mp4" type="video/webm">
   Trình duyệt của bạn không hỗ trợ thẻ video.
 </video>
+
 
