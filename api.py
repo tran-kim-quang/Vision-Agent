@@ -1,15 +1,21 @@
 import json
 import os
+import shutil
+import uuid
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, ToolMessage
 from pydantic import BaseModel
+
+_UPLOAD_DIR = Path("assets/uploads")
+_ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
 from agents.supervisor_agent import supervisor
 
@@ -135,6 +141,18 @@ async def stream_inference(request: InferenceRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/api/upload")
+async def upload_image(file: UploadFile = File(...)):
+    _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    ext = Path(file.filename or "image.jpg").suffix.lower()
+    if ext not in _ALLOWED_EXTS:
+        ext = ".jpg"
+    dest = _UPLOAD_DIR / f"{uuid.uuid4().hex}{ext}"
+    with dest.open("wb") as f:
+        shutil.copyfileobj(file.file, f)
+    return {"path": str(dest.resolve())}
 
 
 @app.get("/health")

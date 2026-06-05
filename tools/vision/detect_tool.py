@@ -9,9 +9,10 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 _OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+_OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
 _YOLO_MODEL_PATH = os.getenv("YOLO_MODEL_PATH", "models/yolo11x.pt")
 
-_llm = ChatOpenAI(model="gemma4:31b-cloud", base_url=_OLLAMA_BASE_URL, api_key="ollama")
+_llm = ChatOpenAI(model="gemma4:31b-cloud", base_url=_OLLAMA_BASE_URL, api_key=_OLLAMA_API_KEY)
 
 
 # ── YOLO model (loaded once) ───────────────────────────────────────────────────

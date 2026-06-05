@@ -7,13 +7,14 @@ from agents.research_agent import research_agent
 from agents.vision_agent import vision_agent
 
 _OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+_OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
 
 supervisor = create_supervisor(
     model=init_chat_model(
         model="kimi-k2.5:cloud",
         model_provider="openai",
         base_url=_OLLAMA_BASE_URL,
-        api_key="ollama",
+        api_key=_OLLAMA_API_KEY,
     ),
     agents=[research_agent, vision_agent],
     prompt=(
