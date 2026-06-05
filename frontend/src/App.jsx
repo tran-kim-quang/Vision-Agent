@@ -14,6 +14,8 @@ function agentMeta(name) {
   return AGENT_META[name] ?? { icon: '🤖', label: name, color: '#94a3b8' }
 }
 
+const _LS_KEY = 'va_session_id'
+
 function genSessionId() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
@@ -94,7 +96,14 @@ function ChatMessage({ msg }) {
 
 // ── Main app ───────────────────────────────────────────────────────────────
 export default function App() {
-  const [sessionId] = useState(genSessionId)  // stable for the lifetime of the tab
+  // Persist session across page refreshes via localStorage
+  const [sessionId, setSessionId] = useState(() => {
+    const stored = localStorage.getItem(_LS_KEY)
+    if (stored) return stored
+    const id = genSessionId()
+    localStorage.setItem(_LS_KEY, id)
+    return id
+  })
   const [input, setInput] = useState('')
   const [attachedImage, setAttachedImage] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
@@ -294,15 +303,15 @@ export default function App() {
   }
 
   const newChat = () => {
+    // New UUID = new LangGraph thread = agent starts fresh
+    const id = genSessionId()
+    localStorage.setItem(_LS_KEY, id)
+    setSessionId(id)
     setChatHistory([])
     setAgentData({})
     setAgentOrder([])
     setStreamingText('')
     setErrorMsg('')
-    // Session ID stays the same so MemorySaver still has history on the server,
-    // but the UI is cleared for a fresh visual start.
-    // To also clear server-side history, generate a new session:
-    // window.location.reload()
   }
 
   const subAgents = agentOrder.filter(n => n !== 'supervisor')

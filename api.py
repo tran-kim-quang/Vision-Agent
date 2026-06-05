@@ -184,5 +184,26 @@ async def upload_image(file: UploadFile = File(...)):
 
 @app.get("/health")
 async def health(req: Request):
-    checkpointer_type = type(req.app.state.checkpointer).__name__
-    return {"status": "ok", "memory": checkpointer_type}
+    return {"status": "ok", "memory": type(req.app.state.checkpointer).__name__}
+
+
+@app.get("/api/history/{session_id}")
+async def get_history(session_id: str, req: Request):
+    """Debug endpoint — shows what messages the agent has stored for a session."""
+    config = {"configurable": {"thread_id": session_id}}
+    try:
+        state = req.app.state.supervisor.get_state(config)
+        messages = state.values.get("messages", [])
+        return {
+            "session_id": session_id,
+            "message_count": len(messages),
+            "messages": [
+                {
+                    "role": getattr(m, "type", "unknown"),
+                    "preview": str(getattr(m, "content", ""))[:120],
+                }
+                for m in messages
+            ],
+        }
+    except Exception as exc:
+        return {"session_id": session_id, "error": str(exc)}
