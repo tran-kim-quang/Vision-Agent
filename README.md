@@ -275,6 +275,6 @@ trace thực thi LangGraph tại [smith.langchain.com](https://smith.langchain.c
 
 ## Demo
 
-[assets/demo_test.mp4](assets/demo_test.mp4):
+[assets/demo_test.mp4](assets/demo_test.mp4)
 
 
