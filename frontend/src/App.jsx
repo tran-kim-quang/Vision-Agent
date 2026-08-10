@@ -17,6 +17,7 @@ function agentMeta(name) {
 }
 
 const _LS_KEY = 'va_session_id'
+const HANDOFF_NOTICE_MS = 1800
 
 function genSessionId() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
@@ -197,9 +198,12 @@ export default function App() {
   const [agentOrder, setAgentOrder] = useState([])
 
   const [errorMsg, setErrorMsg] = useState('')
+  const [handoffNotice, setHandoffNotice] = useState(null)
 
   const chatEndRef = useRef(null)
   const fileInputRef = useRef(null)
+  const handoffTimerRef = useRef(null)
+  const lastHandoffRef = useRef({ target: '', at: 0 })
   const agentTextAccumRef = useRef({})
   // Mirror of streamingText in a ref so the 'done' handler can read the
   // current value synchronously without calling setState inside a setState updater.
@@ -208,6 +212,35 @@ export default function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [chatHistory, streamingText])
+
+  useEffect(() => () => {
+    if (handoffTimerRef.current) clearTimeout(handoffTimerRef.current)
+  }, [])
+
+  const showAgentNotice = useCallback((target) => {
+    if (!target || target.toLowerCase().includes('back')) return
+
+    const now = Date.now()
+    if (lastHandoffRef.current.target === target && now - lastHandoffRef.current.at < 700) return
+    lastHandoffRef.current = { target, at: now }
+
+    const meta = agentMeta(target)
+    setHandoffNotice({
+      id: genSessionId(),
+      text: `Transferred to ${meta.label}`,
+      color: meta.color,
+    })
+
+    if (handoffTimerRef.current) clearTimeout(handoffTimerRef.current)
+    handoffTimerRef.current = setTimeout(() => {
+      setHandoffNotice(null)
+      handoffTimerRef.current = null
+    }, HANDOFF_NOTICE_MS)
+  }, [])
+
+  const showHandoffNotice = useCallback((event) => {
+    showAgentNotice(event.target || event.tool?.replace(/^transfer_to_/i, ''))
+  }, [showAgentNotice])
 
   // ── Image upload ───────────────────────────────────────────────────────────
   const uploadFile = useCallback(async (file) => {
@@ -218,8 +251,13 @@ export default function App() {
       form.append('file', file)
       const res = await fetch('/api/upload', { method: 'POST', body: form })
       if (!res.ok) throw new Error(`Upload failed (${res.status})`)
-      const { path } = await res.json()
-      setAttachedImage({ previewUrl: URL.createObjectURL(file), serverPath: path, name: file.name || 'image' })
+      const uploaded = await res.json()
+      setAttachedImage({
+        previewUrl: URL.createObjectURL(file),
+        serverPath: uploaded.path,
+        mimeType: uploaded.mime_type || file.type,
+        name: uploaded.name || file.name || 'image',
+      })
     } catch (err) {
       setErrorMsg(err.message)
     } finally {
@@ -281,6 +319,11 @@ export default function App() {
       case 'agent_start':
         setAgentOrder(prev => prev.includes(event.agent) ? prev : [...prev, event.agent])
         setAgentData(prev => ({ ...prev, [event.agent]: prev[event.agent] ?? { sections: [], isActive: true } }))
+        if (event.agent !== 'supervisor') {
+          streamingTextRef.current = ''
+          setStreamingText('')
+          showAgentNotice(event.agent)
+        }
         break
       case 'token':
         if (event.agent === 'supervisor') {
@@ -297,6 +340,7 @@ export default function App() {
         pushSection(event.agent, { type: 'tool_result', tool: event.tool, content: event.content })
         break
       case 'handoff':
+        showHandoffNotice(event)
         // Only clear when the supervisor routes OUT to a sub-agent (transfer_to_X).
         // Do NOT clear on the return trip (transfer_back_to_supervisor).
         if (!event.tool?.toLowerCase().includes('back')) {
@@ -308,6 +352,7 @@ export default function App() {
         setErrorMsg(event.content)
         break
       case 'done': {
+        setHandoffNotice(null)
         // Mark all agents done
         setAgentData(prev => {
           const next = {}
@@ -341,17 +386,22 @@ export default function App() {
       }
       default: break
     }
-  }, [pushSection])
+  }, [pushSection, showAgentNotice, showHandoffNotice])
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     const hasContent = input.trim() || attachedImage
     if (!hasContent || isStreaming || isUploading) return
 
-    let message = input.trim()
-    if (attachedImage) {
-      message = message ? `${message}\n\nImage: ${attachedImage.serverPath}` : `Image: ${attachedImage.serverPath}`
-    }
+    const message = input.trim()
+    const attachments = attachedImage
+      ? [{
+        type: 'image',
+        path: attachedImage.serverPath,
+        name: attachedImage.name,
+        mime_type: attachedImage.mimeType,
+      }]
+      : []
 
     // Add user message to history
     setChatHistory(h => [...h, {
@@ -368,6 +418,7 @@ export default function App() {
     streamingTextRef.current = ''
     setStreamingText('')
     setErrorMsg('')
+    setHandoffNotice(null)
     setIsStreaming(true)
     agentTextAccumRef.current = {}
 
@@ -375,7 +426,7 @@ export default function App() {
       const response = await fetch('/api/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, session_id: sessionId }),
+        body: JSON.stringify({ message, session_id: sessionId, attachments }),
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
@@ -503,6 +554,19 @@ export default function App() {
           </div>
         </section>
       </div>
+
+      {/* Error banner */}
+      {handoffNotice && (
+        <div
+          key={handoffNotice.id}
+          className="handoff-toast"
+          style={{ '--notice-color': handoffNotice.color }}
+          role="status"
+        >
+          <span className="handoff-dot" />
+          <span>{handoffNotice.text}</span>
+        </div>
+      )}
 
       {/* Error banner */}
       {errorMsg && (
