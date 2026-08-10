@@ -1,31 +1,43 @@
+import json
 import os
 import re
 from functools import lru_cache
 from typing import Annotated
 
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
-_OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-_OLLAMA_API_KEY  = os.getenv("OLLAMA_API_KEY",  "ollama")
 _YOLO_MODEL_PATH = os.getenv("YOLO_MODEL_PATH",  "models/yolo11x.pt")
-
-_llm = ChatOpenAI(model="gemma4:31b-cloud", base_url=_OLLAMA_BASE_URL, api_key=_OLLAMA_API_KEY)
 
 
 # ── Path extraction (same regex as describe_tool) ─────────────────────────────
 _PATH_PATTERNS = [
-    re.compile(r'Image:\s*(\S+)',                    re.IGNORECASE),
-    re.compile(r'(/[\w/.\-]+\.(?:jpe?g|png|gif|webp|bmp))', re.IGNORECASE),
+    re.compile(r'^\s*path:\s*(.+?)\s*$', re.IGNORECASE | re.MULTILINE),
+    re.compile(r'^\s*Image:\s*(.+?)\s*$', re.IGNORECASE | re.MULTILINE),
     re.compile(r'(https?://\S+\.(?:jpe?g|png|gif|webp|bmp)\S*)', re.IGNORECASE),
+    re.compile(r'([A-Za-z]:[\\/][^\r\n<>|?*"]+\.(?:jpe?g|png|gif|webp|bmp))', re.IGNORECASE),
+    re.compile(r'(/[\w/.\- ]+\.(?:jpe?g|png|gif|webp|bmp))', re.IGNORECASE),
 ]
 
 def _extract_path(text: str) -> str | None:
+    try:
+        payload = json.loads(text)
+        if isinstance(payload, dict):
+            for key in ("path", "image_path", "url", "image_url"):
+                if payload.get(key):
+                    return str(payload[key]).strip().strip('"\'`')
+            attachments = payload.get("attachments")
+            if isinstance(attachments, list):
+                for item in attachments:
+                    if isinstance(item, dict) and item.get("path"):
+                        return str(item["path"]).strip().strip('"\'`')
+    except (TypeError, json.JSONDecodeError):
+        pass
+
     for pattern in _PATH_PATTERNS:
         m = pattern.search(text)
         if m:
-            return m.group(1).strip()
+            return m.group(1).strip().strip('"\'`')
     return None
 
 

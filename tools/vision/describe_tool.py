@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 import re
 from typing import Optional
@@ -9,30 +10,49 @@ from langchain_core.callbacks import AsyncCallbackManagerForToolRun, CallbackMan
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool
 from langchain_core.tools.base import ArgsSchema
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from langchain.output_parsers import PydanticOutputParser
+from utils.llm import build_ollama_chat_model
 
-_OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-_OLLAMA_API_KEY  = os.getenv("OLLAMA_API_KEY",  "ollama")
+VISION_MODEL_NAME = os.getenv("VISUAL_MODEL_NAME", "gemma4:31b-cloud")
 
-_llm = ChatOpenAI(model="gemma4:31b-cloud", base_url=_OLLAMA_BASE_URL, api_key=_OLLAMA_API_KEY)
+_llm = build_ollama_chat_model(VISION_MODEL_NAME)
 
 
 # ── Path extraction (regex — faster and more reliable than an LLM call) ────────
 _PATH_PATTERNS = [
-    re.compile(r'Image:\s*(\S+)',                    re.IGNORECASE),   # "Image: /path/to/img.jpg"
-    re.compile(r'(/[\w/.\-]+\.(?:jpe?g|png|gif|webp|bmp))', re.IGNORECASE),  # bare absolute path
-    re.compile(r'(https?://\S+\.(?:jpe?g|png|gif|webp|bmp)\S*)', re.IGNORECASE),  # URL
+    re.compile(r'^\s*path:\s*(.+?)\s*$', re.IGNORECASE | re.MULTILINE),
+    re.compile(r'^\s*Image:\s*(.+?)\s*$', re.IGNORECASE | re.MULTILINE),
+    re.compile(r'(https?://\S+\.(?:jpe?g|png|gif|webp|bmp)\S*)', re.IGNORECASE),
+    re.compile(r'([A-Za-z]:[\\/][^\r\n<>|?*"]+\.(?:jpe?g|png|gif|webp|bmp))', re.IGNORECASE),
+    re.compile(r'(/[\w/.\- ]+\.(?:jpe?g|png|gif|webp|bmp))', re.IGNORECASE),
 ]
 
 def _extract_path(text: str) -> str | None:
+    try:
+        payload = json.loads(text)
+        if isinstance(payload, dict):
+            for key in ("path", "image_path", "url", "image_url"):
+                if payload.get(key):
+                    return str(payload[key]).strip().strip('"\'`')
+            attachments = payload.get("attachments")
+            if isinstance(attachments, list):
+                for item in attachments:
+                    if isinstance(item, dict) and item.get("path"):
+                        return str(item["path"]).strip().strip('"\'`')
+    except (TypeError, json.JSONDecodeError):
+        pass
+
     for pattern in _PATH_PATTERNS:
         m = pattern.search(text)
         if m:
-            return m.group(1).strip()
+            return m.group(1).strip().strip('"\'`')
     return None
+
+
+def _detect_mime(image_path: str) -> str | None:
+    return magic.Magic(mime=True).from_file(image_path)
 
 
 # ── Image encoding ─────────────────────────────────────────────────────────────
@@ -52,7 +72,10 @@ def _encode_image(image_path: str) -> tuple[str | None, str | None]:
         if not os.path.exists(image_path):
             print(f"[describe_tool] file not found: {image_path!r}")
             return None, None
-        mime = magic.Magic(mime=True).from_file(image_path)
+        mime = _detect_mime(image_path)
+        if not mime:
+            print(f"[describe_tool] cannot determine MIME type: {image_path!r}")
+            return None, None
         if not mime.startswith("image/"):
             print(f"[describe_tool] not an image MIME ({mime}): {image_path!r}")
             return None, None

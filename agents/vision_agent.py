@@ -1,20 +1,15 @@
 import os
 
-from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
 from tools.vision.describe_tool import image_describer_tool
 from tools.vision.detect_tool import detect_and_count_tool
+from utils.llm import build_ollama_chat_model
 
-_OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-_OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
+VISION_MODEL_NAME = os.getenv("VISUAL_MODEL_NAME", "gemma4:31b-cloud")
 
 vision_agent = create_react_agent(
-    model=ChatOpenAI(
-        model="gemma4:31b-cloud",
-        base_url=_OLLAMA_BASE_URL,
-        api_key=_OLLAMA_API_KEY,
-    ),
+    model=build_ollama_chat_model(VISION_MODEL_NAME),
     tools=[image_describer_tool, detect_and_count_tool],
     prompt=(
         "You are a vision agent.\n\n"

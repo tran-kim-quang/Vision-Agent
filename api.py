@@ -7,13 +7,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).with_name(".env"), override=True)
 
 from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessageChunk, ToolMessage
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from agents.supervisor_agent import build_supervisor
 
@@ -69,6 +69,7 @@ app.add_middleware(
 class InferenceRequest(BaseModel):
     message: str
     session_id: str = "default"
+    attachments: list[dict] = Field(default_factory=list)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -88,6 +89,19 @@ def _extract_text(content) -> str:
             if isinstance(p, dict) and p.get("type") == "text"
         )
     return ""
+
+
+def _handoff_target(tool_name: str) -> str | None:
+    name = tool_name.lower()
+    if not name.startswith("transfer_to_"):
+        return None
+    return tool_name[len("transfer_to_"):]
+
+
+def _is_transfer_message(msg) -> bool:
+    name = (getattr(msg, "name", "") or "").lower()
+    content = str(getattr(msg, "content", "") or "").lower()
+    return "transfer" in name or content.startswith("successfully transferred")
 
 
 # ── SSE stream ─────────────────────────────────────────────────────────────────
@@ -144,7 +158,7 @@ async def event_stream(message: str, session_id: str, supervisor):
                             # Routing to a sub-agent — reset flag so updates fallback can run later
                             supervisor_text_sent = False
                             _dbg("  → supervisor_text_sent reset to False")
-                        yield f"data: {json.dumps({'type': 'handoff', 'agent': agent, 'tool': tool_name})}\n\n"
+                        yield f"data: {json.dumps({'type': 'handoff', 'agent': agent, 'tool': tool_name, 'target': _handoff_target(tool_name)})}\n\n"
                     else:
                         yield f"data: {json.dumps({'type': 'tool_result', 'agent': agent, 'tool': tool_name, 'content': str(chunk.content)[:1000]})}\n\n"
 
@@ -174,6 +188,8 @@ async def event_stream(message: str, session_id: str, supervisor):
                         msgs = state.get("messages", [])
                         _dbg(f"  supervisor update: {len(msgs)} messages")
                         for msg in reversed(msgs):
+                            if _is_transfer_message(msg):
+                                continue
                             text         = _extract_text(getattr(msg, "content", ""))
                             has_tc       = bool(getattr(msg, "tool_calls", None))
                             _dbg(f"    msg={type(msg).__name__} has_tc={has_tc} text={text[:60]!r}")
@@ -194,11 +210,31 @@ async def event_stream(message: str, session_id: str, supervisor):
     yield f"data: {json.dumps({'type': 'done', 'supervisor_responded': supervisor_text_sent})}\n\n"
 
 
+def _message_with_attachments(message: str, attachments: list[dict]) -> str:
+    if not attachments:
+        return message
+
+    lines = [message.strip(), "", "[Attached images]"]
+    for idx, item in enumerate(attachments, start=1):
+        path = str(item.get("path") or "").strip()
+        if not path:
+            continue
+        name = str(item.get("name") or f"image-{idx}").strip()
+        mime_type = str(item.get("mime_type") or "").strip()
+        lines.append(f"{idx}. name: {name}")
+        lines.append(f"   path: {path}")
+        if mime_type:
+            lines.append(f"   mime_type: {mime_type}")
+
+    return "\n".join(lines).strip()
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 @app.post("/api/stream")
 async def stream_inference(request: InferenceRequest, req: Request):
+    message = _message_with_attachments(request.message, request.attachments)
     return StreamingResponse(
-        event_stream(request.message, request.session_id, req.app.state.supervisor),
+        event_stream(message, request.session_id, req.app.state.supervisor),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -213,7 +249,11 @@ async def upload_image(file: UploadFile = File(...)):
     dest = _UPLOAD_DIR / f"{uuid.uuid4().hex}{ext}"
     with dest.open("wb") as f:
         shutil.copyfileobj(file.file, f)
-    return {"path": str(dest.resolve())}
+    return {
+        "path": str(dest.resolve()),
+        "name": file.filename or dest.name,
+        "mime_type": file.content_type or "image/jpeg",
+    }
 
 
 @app.get("/health")

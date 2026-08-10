@@ -1,13 +1,12 @@
 import os
 
-from langchain.chat_models import init_chat_model
 from langgraph_supervisor import create_supervisor
 
 from agents.research_agent import research_agent
 from agents.vision_agent import vision_agent
+from utils.llm import build_ollama_chat_model
 
-_OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-_OLLAMA_API_KEY  = os.getenv("OLLAMA_API_KEY",  "ollama")
+SUPERVISOR_MODEL_NAME = os.getenv("SUPERVISOR_MODEL_NAME", "gemma4:31b-cloud")
 
 _PROMPT = (
     "You are a supervisor managing two specialized agents:\n"
@@ -34,12 +33,7 @@ def build_supervisor(checkpointer=None):
     Called once at startup from api.py lifespan.
     """
     return create_supervisor(
-        model=init_chat_model(
-            model="kimi-k2.5:cloud",
-            model_provider="openai",
-            base_url=_OLLAMA_BASE_URL,
-            api_key=_OLLAMA_API_KEY,
-        ),
+        model=build_ollama_chat_model(SUPERVISOR_MODEL_NAME),
         agents=[research_agent, vision_agent],
         prompt=_PROMPT,
         add_handoff_back_messages=True,
