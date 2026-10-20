@@ -277,4 +277,12 @@ trace thực thi LangGraph tại [smith.langchain.com](https://smith.langchain.c
 
 [assets/demo_test.mp4](assets/demo_test.mp4)
 
+## 3D Geometry Viewer (nhánh feature/geo3d-viewer)
+
+Viewer hình học không gian 3D tương tác (three.js): spec ngữ nghĩa → kernel tự tính tọa độ → cổng kiểm tra (cấu trúc + khẳng định hình học) → render. LLM không bao giờ được cấp tọa độ trực tiếp, nên hình sai bị chặn trước khi vẽ.
+
+- Trang viewer: `http://localhost:8000/geo3d/` (xoay/kéo/zoom, click đỉnh xem tọa độ, cạnh khuất tự vẽ nét đứt)
+- API: `GET /geometry/presets`, `GET /geometry/presets/{id}`, `POST /geometry/build`
+- Mã nguồn: package `geometry3d/` (kernel + validator + preset SGK Toán 12), kiểm thử: `python tests/test_geometry3d.py`
+
 

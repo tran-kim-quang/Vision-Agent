@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Geometry Viewer — Visual RAG</title>
+<style>
+  :root { --bg:#14231c; --panel:#1d3329; --line:#33503f; --chalk:#eef5ee; --accent:#ffd75e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--chalk); display:flex; height:100vh; }
+  #side { width:320px; padding:14px; background:var(--panel); overflow-y:auto; border-right:1px solid var(--line); }
+  #side h1 { font-size:17px; margin:0 0 4px; color:var(--accent); }
+  #side p.hint { font-size:12px; opacity:.75; margin:0 0 12px; }
+  #side h2 { font-size:13px; margin:16px 0 6px; text-transform:uppercase; letter-spacing:.06em; opacity:.85; }
+  .preset { display:block; width:100%; text-align:left; margin:0 0 6px; padding:8px 10px;
+             background:#264434; color:var(--chalk); border:1px solid var(--line); border-radius:8px; cursor:pointer; font-size:13px; }
+  .preset:hover { background:#2e5240; }
+  textarea { width:100%; height:150px; background:#10201a; color:var(--chalk); border:1px solid var(--line);
+             border-radius:8px; padding:8px; font-family: ui-monospace, monospace; font-size:12px; }
+  button.action { margin-top:8px; padding:8px 14px; background:var(--accent); color:#1d2b1f; border:0; border-radius:8px; font-weight:600; cursor:pointer; }
+  label.tgl { display:block; font-size:13px; margin:6px 0; cursor:pointer; }
+  #gate { font-size:12px; line-height:1.5; }
+  #gate .ok { color:#8fe388; } #gate .bad { color:#ff9a8a; }
+  #info { font-size:13px; background:#10201a; border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-height:38px; }
+  #view { flex:1; position:relative; }
+  canvas { display:block; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="side">
+  <h1>3D Geometry Viewer</h1>
+  <p class="hint">Hình do kernel tính tọa độ &amp; kiểm tra trước khi vẽ — three.js chỉ render. Kéo để xoay, lăn chuột để zoom, click vào một đỉnh để xem tọa độ.</p>
+
+  <h2>Hình mẫu (SGK Toán 12)</h2>
+  <div id="presets"></div>
+
+  <h2>Spec JSON tự nhập</h2>
+  <textarea id="spec" spellcheck="false">{
+  "kind": "square_pyramid",
+  "params": {"a": 4, "h": 3},
+  "claims": [
+    {"type": "distance", "a": "S", "b": "O", "expect": 3}
+  ]
+}</textarea>
+  <button class="action" id="build">Dựng hình</button>
+
+  <h2>Tùy chọn</h2>
+  <label class="tgl"><input type="checkbox" id="tgl-labels" checked> Nhãn điểm</label>
+  <label class="tgl"><input type="checkbox" id="tgl-axes" checked> Trục Oxyz + lưới</label>
+  <label class="tgl"><input type="checkbox" id="tgl-dash" checked> Cạnh khuất vẽ nét đứt</label>
+
+  <h2>Điểm đang chọn</h2>
+  <div id="info">Chưa chọn điểm nào.</div>
+
+  <h2>Cổng kiểm tra (kernel)</h2>
+  <div id="gate">Chưa dựng hình.</div>
+</div>
+<div id="view"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const view = document.getElementById('view');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x14231c);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+camera.position.set(7, 5.5, 8);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+view.appendChild(renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
+scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(6, 10, 4);
+scene.add(sun);
+const axes = new THREE.AxesHelper(5);
+const grid = new THREE.GridHelper(12, 12, 0x33503f, 0x27402f);
+grid.rotation.x = 0; grid.position.y = -0.001;
+scene.add(axes, grid);
+
+function resize() {
+  const w = view.clientWidth, h = view.clientHeight;
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', resize); resize();
+
+let model = null;           // THREE.Group of the current solid
+let edgeRecords = [];       // { line, solidMat, dashMat, faces:[normals] }
+let pickables = [];         // vertex meshes
+let faceNormals = [];       // per-face world normals (model is never rotated)
+
+function makeLabel(text) {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+  const g = c.getContext('2d');
+  g.font = 'bold 64px system-ui'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.shadowColor = 'rgba(0,0,0,.8)'; g.shadowBlur = 8;
+  g.fillStyle = '#ffd75e'; g.fillText(text, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(0.55, 0.55, 1);
+  return sp;
+}
+
+function faceNormal(pts) {
+  // Newell's method
+  const n = new THREE.Vector3();
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i], q = pts[(i + 1) % pts.length];
+    n.x += (p.y - q.y) * (p.z + q.z);
+    n.y += (p.z - q.z) * (p.x + q.x);
+    n.z += (p.x - q.x) * (p.y + q.y);
+  }
+  return n.normalize();
+}
+
+function clearModel() {
+  if (model) { scene.remove(model); model.traverse(o => { o.geometry?.dispose?.(); }); }
+  model = new THREE.Group(); edgeRecords = []; pickables = []; faceNormals = [];
+  scene.add(model);
+}
+
+function showGate(data) {
+  const el = document.getElementById('gate');
+  if (!data) { el.textContent = '—'; return; }
+  if (data.error) { el.innerHTML = `<span class="bad">Lỗi: ${data.error}</span>`; return; }
+  const lines = [];
+  lines.push(data.ok
+    ? '<span class="ok">✔ Cấu trúc đạt — hình được phép render.</span>'
+    : '<span class="bad">✘ Hình KHÔNG đạt kiểm tra.</span>');
+  for (const p of data.checks.structure) lines.push(`<span class="bad">• ${p}</span>`);
+  for (const r of data.checks.claims) {
+    const c = JSON.stringify(r.claim);
+    lines.push(r.ok ? `<span class="ok">✔ ${c}</span>`
+                    : `<span class="bad">✘ ${c} (thực tế: ${typeof r.actual === 'number' ? r.actual.toFixed(4) : r.actual})</span>`);
+  }
+  el.innerHTML = lines.join('<br>');
+}
+
+function renderSolid(data) {
+  clearModel();
+  showGate(data);
+  if (!data.vertices) return;
+  const V = {}, KV = {};
+  // kernel space is z-up (textbook Oxyz); three.js is y-up -> map (x, y, z) to (x, z, -y).
+  // KV keeps the original kernel coordinates for display in the info panel.
+  for (const [name, p] of Object.entries(data.vertices)) {
+    V[name] = new THREE.Vector3(p[0], p[2], -p[1]);
+    KV[name] = new THREE.Vector3(p[0], p[1], p[2]);
+  }
+
+  // centroid -> orbit target
+  const centre = new THREE.Vector3();
+  Object.values(V).forEach(p => centre.add(p));
+  centre.divideScalar(Object.keys(V).length);
+  controls.target.copy(centre);
+
+  // faces
+  faceNormals = data.faces.map(f => faceNormal(f.map(n => V[n])));
+  const faceMat = new THREE.MeshPhongMaterial({ color: 0x9fd8b4, transparent: true, opacity: 0.32,
+                                                  side: THREE.DoubleSide, depthWrite: false });
+  data.faces.forEach((f) => {
+    const pts = f.map(n => V[n]);
+    const pos = [];
+    for (let i = 1; i < pts.length - 1; i++) {
+      pos.push(pts[0].x, pts[0].y, pts[0].z, pts[i].x, pts[i].y, pts[i].z, pts[i + 1].x, pts[i + 1].y, pts[i + 1].z);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    model.add(new THREE.Mesh(geo, faceMat));
+  });
+
+  // edges, with per-edge adjacent face normals for hidden-edge dashing
+  const adj = new Map();
+  data.faces.forEach((f, fi) => {
+    for (let i = 0; i < f.length; i++) {
+      const key = [f[i], f[(i + 1) % f.length]].sort().join('|');
+      if (!adj.has(key)) adj.set(key, []);
+      adj.get(key).push(fi);
+    }
+  });
+  const mkMats = () => ({
+    solid: new THREE.LineBasicMaterial({ color: 0xeef5ee }),
+    dash: new THREE.LineDashedMaterial({ color: 0x9db8a6, dashSize: 0.14, gapSize: 0.1 }),
+  });
+  for (const [a, b] of data.edges) {
+    const geo = new THREE.BufferGeometry().setFromPoints([V[a], V[b]]);
+    const { solid, dash } = mkMats();
+    const line = new THREE.Line(geo, solid);
+    line.computeLineDistances();
+    line.userData.faces = (adj.get([a, b].sort().join('|')) || []).map(fi => faceNormals[fi]);
+    line.userData.mid = V[a].clone().add(V[b]).multiplyScalar(0.5);
+    model.add(line);
+    edgeRecords.push({ line, solid, dash });
+  }
+  // auxiliary edges (e.g. height SO): always dashed, gray
+  for (const [a, b] of (data.aux_edges || [])) {
+    const geo = new THREE.BufferGeometry().setFromPoints([V[a], V[b]]);
+    const line = new THREE.Line(geo, new THREE.LineDashedMaterial({ color: 0xbfae7d, dashSize: 0.12, gapSize: 0.09 }));
+    line.computeLineDistances();
+    model.add(line);
+  }
+
+  // vertices + labels
+  const aux = new Set(data.aux_points || []);
+  const showLabels = document.getElementById('tgl-labels').checked;
+  for (const [name, p] of Object.entries(V)) {
+    const isAux = aux.has(name);
+    const m = new THREE.Mesh(
+      new THREE.SphereGeometry(isAux ? 0.035 : 0.05, 16, 16),
+      new THREE.MeshBasicMaterial({ color: isAux ? 0xbfae7d : 0xffd75e }));
+    m.position.copy(p);
+    m.userData = { name, point: KV[name] };
+    model.add(m); pickables.push(m);
+    if (showLabels) {
+      const label = makeLabel(name);
+      label.position.copy(p).add(new THREE.Vector3(0.14, 0.14, 0.14));
+      model.add(label);
+    }
+  }
+}
+
+function updateHiddenEdges() {
+  const dashOn = document.getElementById('tgl-dash').checked;
+  for (const rec of edgeRecords) {
+    if (!dashOn) { rec.line.material = rec.solid; continue; }
+    const toCam = camera.position.clone().sub(rec.line.userData.mid).normalize();
+    const hidden = rec.line.userData.faces.length > 0 &&
+                   rec.line.userData.faces.every(n => n.dot(toCam) < 0);
+    rec.line.material = hidden ? rec.dash : rec.solid;
+  }
+}
+
+// picking
+const ray = new THREE.Raycaster();
+renderer.domElement.addEventListener('click', (ev) => {
+  const r = renderer.domElement.getBoundingClientRect();
+  const mouse = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1,
+                                  -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(pickables)[0];
+  const info = document.getElementById('info');
+  if (hit) {
+    const { name, point } = hit.object.userData;
+    info.innerHTML = `Điểm <b>${name}</b>: (${point.x.toFixed(2)}, ${point.y.toFixed(2)}, ${point.z.toFixed(2)})`;
+  } else info.textContent = 'Chưa chọn điểm nào.';
+});
+
+// data loading
+async function loadPreset(id) {
+  const res = await fetch(`/geometry/presets/${id}`);
+  renderSolid(await res.json());
+}
+async function init() {
+  try {
+    const res = await fetch('/geometry/presets');
+    const { presets } = await res.json();
+    const box = document.getElementById('presets');
+    presets.forEach((p, i) => {
+      const b = document.createElement('button');
+      b.className = 'preset'; b.textContent = p.title;
+      b.onclick = () => loadPreset(p.id);
+      box.appendChild(b);
+      if (i === 0) loadPreset(p.id);
+    });
+  } catch (e) {
+    document.getElementById('gate').innerHTML =
+      '<span class="bad">Không gọi được API — hãy mở trang này qua server FastAPI (uvicorn api:app).</span>';
+  }
+}
+document.getElementById('build').onclick = async () => {
+  try {
+    const spec = JSON.parse(document.getElementById('spec').value);
+    const res = await fetch('/geometry/build', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(spec),
+    });
+    renderSolid(await res.json());
+  } catch (e) {
+    showGate({ error: 'Spec không phải JSON hợp lệ: ' + e.message });
+  }
+};
+document.getElementById('tgl-labels').onchange = () => init0();
+document.getElementById('tgl-axes').onchange = (e) => { axes.visible = grid.visible = e.target.checked; };
+let lastData = null;
+const _renderSolid = renderSolid;
+renderSolid = (d) => { lastData = d; _renderSolid(d); };
+function init0() { if (lastData) renderSolid(lastData); }
+
+function loop() { requestAnimationFrame(loop); updateHiddenEdges(); controls.update(); renderer.render(scene, camera); }
+init(); loop();
+</script>
+</body>
+</html>

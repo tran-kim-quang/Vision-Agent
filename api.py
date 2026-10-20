@@ -12,6 +12,9 @@ load_dotenv(Path(__file__).with_name(".env"), override=True)
 from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
+
+from geometry3d import PRESETS, build_solid
 from langchain_core.messages import AIMessageChunk, ToolMessage
 from pydantic import BaseModel, Field
 
@@ -277,3 +280,38 @@ async def get_history(session_id: str, req: Request):
         }
     except Exception as exc:
         return {"session_id": session_id, "error": str(exc)}
+
+
+# ── 3D Geometry Viewer (module: geometry3d) ────────────────────────────────
+# Spec -> kernel -> validation gate -> render data. The viewer never
+# receives coordinates that have not passed build_solid's checks.
+
+class GeometryBuildRequest(BaseModel):
+    kind: str
+    params: dict = {}
+    claims: list = []
+
+
+@app.get("/geometry/presets")
+async def geometry_presets():
+    return {"presets": [{"id": p["id"], "title": p["title"]} for p in PRESETS]}
+
+
+@app.get("/geometry/presets/{preset_id}")
+async def geometry_preset(preset_id: str):
+    for p in PRESETS:
+        if p["id"] == preset_id:
+            return {"id": p["id"], "title": p["title"], **build_solid(p["spec"])}
+    return {"ok": False, "error": f"preset not found: {preset_id}"}
+
+
+@app.post("/geometry/build")
+async def geometry_build(req: GeometryBuildRequest):
+    return build_solid(req.model_dump())
+
+
+app.mount(
+    "/geo3d",
+    StaticFiles(directory=Path(__file__).with_name("static") / "geo3d", html=True),
+    name="geo3d",
+)
