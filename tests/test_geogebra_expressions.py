@@ -27,6 +27,11 @@ class ExpressionTests(unittest.TestCase):
             self.parse("(" * 33 + "x" + "+1)" * 33)
         self.assertEqual(caught.exception.code, "expression_too_deep")
 
+    def test_huge_integer_is_reported_as_an_expression_error(self):
+        with self.assertRaises(ExpressionError) as caught:
+            self.parse("9" * 400)
+        self.assertEqual(caught.exception.code, "invalid_expression")
+
     def test_emit_can_rename_variables_without_text_replacement(self):
         tree = self.parse("exp(x)+y")
         self.assertEqual(emit_expression(tree, {"x":"u", "y":"v"}), "(exp(u) + v)")

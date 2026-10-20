@@ -48,7 +48,7 @@ class SchemaTests(unittest.TestCase):
         self.assert_code("wrong_kind", base([{"id":"A","op":"point","coords":[0,0,0]},{"id":"B","op":"point","coords":[1,0,0]},{"id":"l","op":"line","a":"A","b":"B"},{"id":"m","op":"midpoint","a":"A","b":"l"}]))
 
     def test_rejects_nonfinite_numbers_and_reversed_domains(self):
-        for value in (math.inf, math.nan, True):
+        for value in (math.inf, math.nan, True, 10 ** 400):
             self.assert_code("invalid_spec", base([{"id":"A","op":"point","coords":[value,0,0]}]))
         self.assert_code("invalid_domain", {**base([{"id":"f","op":"function2d","expression":"x","domain":[2,1]}]), "app":"graphing"})
 

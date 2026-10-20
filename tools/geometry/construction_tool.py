@@ -13,10 +13,12 @@ from geometry3d.geogebra.validation import SpecError, validate_spec
 MAX_ARTIFACT_BYTES = 64 * 1024
 SUPPORTED_OPS = {"point", "segment", "line", "polygon", "plane", "midpoint", "intersection", "projection", "function2d", "surface_explicit"}
 
+CONSTRUCTION_SPEC_GUIDE = """spec fields: version=1; title; app='graphing' or '3d'; givens=[{text,source_text}]; goals=[text]; display_choices=[text]; steps (1..100). Every step has a unique id and op. Shapes: point {coords:[x,y,z]}; segment/line/midpoint/intersection {a:id,b:id}; polygon/plane {points:[ids]}; projection {point:id,target:id}; function2d {expression,domain:[min,max]}; surface_explicit {expression,x_domain:[min,max],y_domain:[min,max]}. Define referenced objects first. graphing accepts only function2d; surfaces require 3d. Example: {"version":1,"title":"Trung điểm","app":"3d","givens":[{"text":"A(0,0,0), B(4,0,0)","source_text":"A(0,0,0), B(4,0,0)"}],"goals":["Quan sát M"],"display_choices":[],"steps":[{"id":"A","op":"point","coords":[0,0,0]},{"id":"B","op":"point","coords":[4,0,0]},{"id":"M","op":"midpoint","a":"A","b":"B"}]}"""
+
 
 class PrepareGeometryInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    spec: dict
+    spec: dict = Field(description=CONSTRUCTION_SPEC_GUIDE)
     unresolved_issues: list[str] | None = Field(default=None, max_length=10)
 
 
@@ -56,7 +58,7 @@ try:
     prepare_geometry_tool = StructuredTool.from_function(
         func=prepare_geometry,
         name="prepare_geometry",
-        description="Validate a typed geometry construction and compile deterministic GeoGebra commands.",
+        description=f"Validate a typed geometry construction and compile deterministic GeoGebra commands. {CONSTRUCTION_SPEC_GUIDE}",
         args_schema=PrepareGeometryInput,
     )
 except ImportError:  # Pure compiler tests do not require the agent dependency stack.

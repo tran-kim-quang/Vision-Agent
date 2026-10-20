@@ -56,7 +56,11 @@ def parse_expression(text: str, variables: frozenset[str]) -> ExpressionNode:
         if depth > MAX_EXPRESSION_DEPTH:
             raise ExpressionError("expression_too_deep", f"expression exceeds depth {MAX_EXPRESSION_DEPTH}")
         if isinstance(node, ast.Constant) and type(node.value) in (int, float):
-            if not math.isfinite(float(node.value)):
+            try:
+                finite = math.isfinite(float(node.value))
+            except OverflowError:
+                finite = False
+            if not finite:
                 raise ExpressionError("invalid_expression", "numbers must be finite")
             return ExpressionNode("number", node.value)
         if isinstance(node, ast.Name):

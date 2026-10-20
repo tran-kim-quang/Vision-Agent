@@ -11,17 +11,19 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
-from tools.geometry.construction_tool import prepare_geometry, prepare_geometry_tool
+from tools.geometry.construction_tool import CONSTRUCTION_SPEC_GUIDE, prepare_geometry, prepare_geometry_tool
 
 
 MAX_PREPARATION_ATTEMPTS = 3
 
-_PROMPT = """You are a geometry construction agent. Extract source-backed givens,
+_PROMPT = f"""You are a geometry construction agent. Extract source-backed givens,
 construction steps, display choices, and goals separately. Call prepare_geometry with
 the typed construction. Never turn a requested conclusion into an input constraint,
 silently invent a substantive hypothesis, emit raw GeoGebra commands, or claim that a
 figure ran or a goal was proved. If the tool reports an invalid spec, correct it at
-most twice. If information is genuinely ambiguous, submit unresolved_issues."""
+most twice. If information is genuinely ambiguous, submit unresolved_issues.
+
+{CONSTRUCTION_SPEC_GUIDE}"""
 
 
 class GeometryState(TypedDict, total=False):
@@ -57,7 +59,9 @@ def build_geometry_agent(model=None):
         for tool_call in getattr(message, "tool_calls", []):
             name = tool_call.get("name", "")
             call_id = tool_call.get("id", "")
-            if name != "prepare_geometry":
+            if stop:
+                result = _error("request_already_finished", "a prior tool call already produced a terminal result")
+            elif name != "prepare_geometry":
                 result = _error("unknown_tool", f"tool {name!r} is not available")
                 stop = True
             elif attempts >= MAX_PREPARATION_ATTEMPTS:

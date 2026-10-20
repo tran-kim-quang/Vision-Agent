@@ -49,16 +49,20 @@ async function installStreamMock(page, responses) {
 async function installGeoGebraMock(page) {
   await page.route('https://www.geogebra.org/apps/deployggb.js', route => route.fulfill({
     contentType: 'application/javascript',
-    body: `window.GGBApplet = function (params) {
+    body: `window.__ggbMetrics = window.__ggbMetrics || { instances: 0, removed: 0, restored: [] };
+    window.GGBApplet = function (params) {
+      window.__ggbMetrics.instances += 1;
       const labels = new Set();
+      let xml = '<geogebra></geogebra>';
       const api = {
-        evalCommand(command) { const match = command.match(/^([A-Za-z][A-Za-z0-9_]*)\\s*=/); if (match) labels.add(match[1]); return true; },
+        evalCommand(command) { const match = command.match(/^([A-Za-z][A-Za-z0-9_]*)\\s*=/); if (match) labels.add(match[1]); xml = '<constructed></constructed>'; return true; },
         exists(label) { return labels.has(label); },
         isDefined(label) { return labels.has(label); },
-        getXML() { return '<geogebra></geogebra>'; },
-        setXML() {},
-        remove() {},
+        getXML() { return xml; },
+        setXML(value) { xml = value; labels.add('A'); window.__ggbMetrics.restored.push(value); },
+        remove() { window.__ggbMetrics.removed += 1; },
       };
+      window.__latestGgbApi = api;
       this.inject = function () { setTimeout(() => params.appletOnLoad(api), 0); };
       this.remove = function () {};
     };`,
@@ -87,6 +91,7 @@ test('split SSE keeps the artifact on disconnect and renders unsafe text literal
   await expect(card).toContainText('<img onerror=alert(1)> Hình')
   await expect(card.locator('img')).toHaveCount(0)
   await expect(card).toContainText('<script>unsafe()</script>')
+  await expect(page.locator('.geometry-stream-error')).toContainText('kết thúc trước khi hoàn tất')
   await card.getByRole('button', { name: 'Mở hình' }).click()
   await expect(page.getByRole('region', { name: /GeoGebra/ })).toBeVisible()
   await expect(page.getByText('Hình đã hiển thị')).toBeVisible()
@@ -108,6 +113,26 @@ test('two turns keep separate artifacts and opening the latest selects its works
   await expect(page.getByTestId('geometry-artifact')).toHaveCount(2)
   await page.getByTestId('geometry-artifact').nth(1).getByRole('button', { name: 'Mở hình' }).click()
   await expect(page.getByRole('region', { name: /Hình thứ hai/ })).toBeVisible()
+})
+
+test('closing and reopening restores the user-edited GeoGebra state', async ({ page }) => {
+  const session = 'session-restore'
+  await page.addInitScript(value => localStorage.setItem('va_session_id', value), session)
+  await installStreamMock(page, [{ chunks: [{ text: frames(session, 'request-edit', artifact('artifact-edit', 'Hình chỉnh sửa')) }] }])
+  await installGeoGebraMock(page)
+  await page.goto('/')
+
+  await send(page, 'Hình cần chỉnh sửa')
+  await page.getByRole('button', { name: 'Mở hình' }).click()
+  await expect(page.getByText('Hình đã hiển thị')).toBeVisible()
+  await page.evaluate(() => {
+    window.__latestGgbApi.setXML('<geogebra edited="true"></geogebra>')
+    window.__ggbMetrics.restored = []
+  })
+  await page.getByRole('button', { name: 'Đóng' }).click()
+  await page.getByRole('button', { name: 'Mở hình' }).click()
+  await expect(page.getByText('Hình đã hiển thị')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => window.__ggbMetrics.restored.at(-1))).toBe('<geogebra edited="true"></geogebra>')
 })
 
 test('new chat aborts a delayed stream and removes its viewer', async ({ page }) => {

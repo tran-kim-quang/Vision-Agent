@@ -469,15 +469,27 @@ export default function App() {
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let receivedDone = false
+      const dispatchEvents = events => {
+        for (const event of events) {
+          if (event.type === 'done') receivedDone = true
+          handleEvent(event, turnId)
+        }
+      }
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         const parsed = consumeSSEBuffer(buffer, decoder.decode(value, { stream: true }))
         buffer = parsed.buffer
-        for (const event of parsed.events) handleEvent(event, turnId)
+        dispatchEvents(parsed.events)
       }
       const parsed = consumeSSEBuffer(buffer, decoder.decode(), true)
-      for (const event of parsed.events) handleEvent(event, turnId)
+      dispatchEvents(parsed.events)
+      if (!receivedDone) {
+        const message = 'Luồng phản hồi kết thúc trước khi hoàn tất.'
+        applyTurnEvent({ type: 'error', content: message }, turnId)
+        setErrorMsg(message)
+      }
     } catch (err) {
       if (err.name !== 'AbortError') {
         const message = err.message || 'Kết nối bị gián đoạn.'

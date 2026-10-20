@@ -5,7 +5,8 @@ from unittest.mock import patch
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from agents.geometry_agent import build_geometry_agent
+from agents.geometry_agent import _PROMPT, build_geometry_agent
+from tools.geometry.construction_tool import PrepareGeometryInput
 
 
 VALID_SPEC = {
@@ -41,6 +42,12 @@ def invoke(model, request_id="req-1"):
 
 
 class GeometryAgentTests(unittest.TestCase):
+    def test_model_receives_the_construction_contract(self):
+        description = PrepareGeometryInput.model_json_schema()["properties"]["spec"]["description"]
+        for term in ("surface_explicit", "function2d", "coords", "source_text"):
+            self.assertIn(term, description)
+            self.assertIn(term, _PROMPT)
+
     def test_valid_tool_invocation_produces_prepared_tool_message(self):
         model = FakeModel([AIMessage(content="", tool_calls=[call("one", {"spec": VALID_SPEC})])])
         state = invoke(model)
@@ -76,6 +83,18 @@ class GeometryAgentTests(unittest.TestCase):
         self.assertEqual([m.tool_call_id for m in tools], ["a", "b", "c", "d"])
         self.assertEqual(state["geometry_attempts"], 3)
         self.assertEqual(json.loads(tools[-1].content)["status"], "invalid_spec")
+
+    def test_success_or_clarification_stops_later_calls_in_same_message(self):
+        model = FakeModel([AIMessage(content="", tool_calls=[
+            call("clarify", {"spec": VALID_SPEC, "unresolved_issues": ["Thiếu vị trí của A"]}),
+            call("guessed", {"spec": VALID_SPEC}),
+        ])])
+        state = invoke(model)
+        tools = [m for m in state["messages"] if isinstance(m, ToolMessage)]
+        self.assertEqual([m.tool_call_id for m in tools], ["clarify", "guessed"])
+        self.assertEqual(json.loads(tools[0].content)["status"], "needs_clarification")
+        self.assertEqual(json.loads(tools[1].content)["issues"][0]["code"], "request_already_finished")
+        self.assertEqual(state["geometry_attempts"], 1)
 
     def test_unknown_tool_is_bounded_error(self):
         model = FakeModel([AIMessage(content="", tool_calls=[call("x", {}, "delete_everything")])])

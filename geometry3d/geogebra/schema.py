@@ -31,7 +31,11 @@ class PointStep(StrictModel):
     def strict_coords(cls, value):
         if not isinstance(value, (list, tuple)) or len(value) != 3 or any(type(x) not in (int, float) for x in value):
             raise ValueError("coordinates must contain exactly three real numbers")
-        if not all(math.isfinite(float(x)) for x in value):
+        try:
+            finite = all(math.isfinite(float(x)) for x in value)
+        except OverflowError:
+            finite = False
+        if not finite:
             raise ValueError("coordinates must be finite")
         return value
 
