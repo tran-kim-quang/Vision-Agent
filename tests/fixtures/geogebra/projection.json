@@ -1,0 +1,11 @@
+{
+  "version": 1, "title": "Hình chiếu", "app": "3d", "givens": [], "goals": [], "display_choices": [],
+  "steps": [
+    {"id": "A", "op": "point", "coords": [1, 2, 3]},
+    {"id": "O", "op": "point", "coords": [0, 0, 0]},
+    {"id": "X", "op": "point", "coords": [1, 0, 0]},
+    {"id": "Y", "op": "point", "coords": [0, 1, 0]},
+    {"id": "base", "op": "plane", "points": ["O", "X", "Y"]},
+    {"id": "H", "op": "projection", "point": "A", "target": "base"}
+  ]
+}

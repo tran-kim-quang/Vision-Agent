@@ -1,0 +1,1 @@
+{"version":1,"title":"Sine","app":"graphing","givens":[],"goals":[],"display_choices":[],"steps":[{"id":"f","op":"function2d","expression":"sin(x)","domain":[-6,6]}]}
