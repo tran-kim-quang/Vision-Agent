@@ -759,3 +759,60 @@ body {
 ::-webkit-scrollbar-track       { background: transparent; }
 ::-webkit-scrollbar-thumb       { background: var(--border); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* GeoGebra artifacts */
+.geometry-card {
+  margin-top: 0.85rem;
+  padding: 1rem;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.72);
+}
+
+.geometry-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.geometry-card h3 { margin: 0.2rem 0 0; font-size: 1rem; }
+.geometry-kind { color: #86efac; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.geometry-card-section { margin-top: 0.75rem; }
+.geometry-card-section h4 { margin: 0 0 0.25rem; font-size: 0.82rem; color: var(--muted); }
+.geometry-card-section ul { margin: 0; padding-left: 1.2rem; }
+.geometry-card-section li { margin: 0.25rem 0; }
+.geometry-card-section small { display: block; color: var(--muted); }
+.geometry-summary { margin: 0.8rem 0 0; color: var(--muted); font-size: 0.78rem; }
+.geometry-open-btn, .geogebra-toolbar button, .geogebra-error button {
+  border: 1px solid rgba(34, 197, 94, 0.55);
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  background: rgba(34, 197, 94, 0.12);
+  color: #bbf7d0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.geometry-stream-error { color: #fca5a5; font-size: 0.8rem; }
+
+.geogebra-viewer {
+  position: fixed;
+  inset: 4.5rem 2rem 6rem;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+.geogebra-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); }
+.geogebra-canvas { flex: 1; min-height: 0; overflow: auto; background: white; }
+.geogebra-error { padding: 1rem; overflow: auto; }
+
+@media (max-width: 700px) {
+  .geometry-card-heading { flex-direction: column; }
+  .geometry-open-btn { width: 100%; }
+  .geogebra-viewer { inset: 3.75rem 0.5rem 5.5rem; }
+}
