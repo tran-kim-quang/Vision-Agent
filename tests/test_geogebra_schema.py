@@ -31,7 +31,7 @@ class SchemaTests(unittest.TestCase):
     def test_rejects_duplicate_and_reserved_ids(self):
         self.assert_code("duplicate_id", base([{"id": "A", "op": "point", "coords": [0,0,0]}, {"id": "A", "op": "point", "coords": [1,0,0]}]))
         self.assert_code("reserved_id", base([{"id": "x", "op": "point", "coords": [0,0,0]}]))
-        self.assert_code("reserved_id", base([{"id": "__ggb_help", "op": "point", "coords": [0,0,0]}]))
+        self.assert_code("reserved_id", base([{"id": "ggbAux1", "op": "point", "coords": [0,0,0]}]))
 
     def test_sorts_dependencies_stably(self):
         raw = base([

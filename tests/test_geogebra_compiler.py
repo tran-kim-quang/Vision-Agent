@@ -31,11 +31,15 @@ class CompilerTests(unittest.TestCase):
         command = compile_construction(validate_spec(raw)).steps[0].commands[0]
         self.assertEqual(command, "s=Surface(u,v,(exp(u) + ln(v)),u,-3.0,3.0,v,-3.0,3.0)")
 
+    def test_function_uses_graphing_app_supported_domain_guard(self):
+        command = compile_construction(validate_spec(fixture("function2d.json"))).steps[0].commands[0]
+        self.assertEqual(command, "f(x)=If(-6.0<=x<=6.0,sin(x))")
+
     def test_projection_emits_supported_perpendicular_construction(self):
         artifact = compile_construction(validate_spec(fixture("projection.json")))
         projection = artifact.steps[-1]
-        self.assertEqual(projection.commands, ["__ggb_H_perp=PerpendicularLine(A,base)", "H=Intersect(__ggb_H_perp,base)"])
-        self.assertEqual(projection.expected_labels, ["__ggb_H_perp", "H"])
+        self.assertEqual(projection.commands, ["ggbAux6=PerpendicularLine(A,base)", "H=Intersect(ggbAux6,base)"])
+        self.assertEqual(projection.expected_labels, ["ggbAux6", "H"])
 
 
 if __name__ == "__main__":

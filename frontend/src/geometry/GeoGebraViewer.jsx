@@ -49,6 +49,8 @@ export default function GeoGebraViewer({ artifact, stateCache, onClose }) {
           }
           clearTimeout(readyTimer)
           api = loadedApi
+          const container = document.getElementById(containerId)
+          if (container) container.__geogebraApi = loadedApi
           setStatus('executing')
           try {
             const snapshot = stateCache.get(artifact.id)
@@ -90,6 +92,8 @@ export default function GeoGebraViewer({ artifact, stateCache, onClose }) {
           if (xml) stateCache.set(artifact.id, String(xml))
         } catch { /* an incomplete applet has no state worth retaining */ }
         api.remove?.()
+        const container = document.getElementById(containerId)
+        if (container) delete container.__geogebraApi
       } else {
         applet?.remove?.()
       }

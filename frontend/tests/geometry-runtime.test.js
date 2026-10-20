@@ -61,6 +61,17 @@ test('executeArtifact checks expected labels', async () => {
   await assert.rejects(executeArtifact(api, artifact, { isCurrent: () => true }), /missing/)
 })
 
+test('executeArtifact rejects a GeoGebra object whose displayed value is undefined', async () => {
+  const api = {
+    evalCommand: () => true,
+    exists: () => true,
+    isDefined: () => true,
+    getValueString: () => 'P = ?',
+  }
+  const artifact = { steps: [{ source_step_id: 'P', commands: ['P=Intersect(l1,l2)'], expected_labels: ['P'] }] }
+  await assert.rejects(executeArtifact(api, artifact, { isCurrent: () => true }), /undefined/)
+})
+
 test('stale execution performs no command', async () => {
   let calls = 0
   const api = { evalCommand() { calls += 1; return true }, exists: () => true, isDefined: () => true }

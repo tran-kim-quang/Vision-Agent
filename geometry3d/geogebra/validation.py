@@ -60,7 +60,7 @@ def validate_spec(raw: dict) -> ValidatedConstruction:
     if isinstance(raw_steps, list):
         for item in raw_steps:
             raw_id = item.get("id") if isinstance(item, dict) else None
-            if isinstance(raw_id, str) and raw_id.startswith("__ggb_"):
+            if isinstance(raw_id, str) and raw_id.startswith("ggbAux"):
                 raise SpecError("reserved_id", raw_id, f"reserved step id {raw_id!r}")
     try:
         spec = ConstructionSpec.model_validate(raw)
@@ -75,7 +75,7 @@ def validate_spec(raw: dict) -> ValidatedConstruction:
     for step in spec.steps:
         if step.id in by_id:
             raise SpecError("duplicate_id", step.id, f"duplicate step id {step.id!r}")
-        if step.id in RESERVED or step.id.startswith("__ggb_"):
+        if step.id in RESERVED or step.id.startswith("ggbAux"):
             raise SpecError("reserved_id", step.id, f"reserved step id {step.id!r}")
         by_id[step.id] = step
 

@@ -1,0 +1,654 @@
+{
+  "tetrahedron": {
+    "id": "7ff23cde-ed5a-5984-b8c2-b191f7b1e897",
+    "version": 1,
+    "app": "3d",
+    "title": "Tứ diện ABCD",
+    "givens": [
+      {
+        "text": "ABCD là tứ diện",
+        "source_text": "Cho tứ diện ABCD"
+      }
+    ],
+    "goals": [
+      "MN song song BC"
+    ],
+    "display_choices": [
+      "Dùng một cấu hình không suy biến để minh họa"
+    ],
+    "steps": [
+      {
+        "source_step_id": "A",
+        "commands": [
+          "A=(0.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "A"
+        ]
+      },
+      {
+        "source_step_id": "B",
+        "commands": [
+          "B=(4.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "B"
+        ]
+      },
+      {
+        "source_step_id": "C",
+        "commands": [
+          "C=(0.0,4.0,0.0)"
+        ],
+        "expected_labels": [
+          "C"
+        ]
+      },
+      {
+        "source_step_id": "D",
+        "commands": [
+          "D=(1.0,1.0,3.0)"
+        ],
+        "expected_labels": [
+          "D"
+        ]
+      },
+      {
+        "source_step_id": "M",
+        "commands": [
+          "M=Midpoint(A,B)"
+        ],
+        "expected_labels": [
+          "M"
+        ]
+      },
+      {
+        "source_step_id": "N",
+        "commands": [
+          "N=Midpoint(A,C)"
+        ],
+        "expected_labels": [
+          "N"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Tứ diện ABCD",
+      "app": "3d",
+      "givens": [
+        {
+          "text": "ABCD là tứ diện",
+          "source_text": "Cho tứ diện ABCD"
+        }
+      ],
+      "goals": [
+        "MN song song BC"
+      ],
+      "display_choices": [
+        "Dùng một cấu hình không suy biến để minh họa"
+      ],
+      "steps": [
+        {
+          "id": "A",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "B",
+          "op": "point",
+          "coords": [
+            4.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "C",
+          "op": "point",
+          "coords": [
+            0.0,
+            4.0,
+            0.0
+          ]
+        },
+        {
+          "id": "D",
+          "op": "point",
+          "coords": [
+            1.0,
+            1.0,
+            3.0
+          ]
+        },
+        {
+          "id": "M",
+          "a": "A",
+          "b": "B",
+          "op": "midpoint"
+        },
+        {
+          "id": "N",
+          "a": "A",
+          "b": "C",
+          "op": "midpoint"
+        }
+      ]
+    }
+  },
+  "projection": {
+    "id": "33822941-20b4-578e-8d49-8844492398e5",
+    "version": 1,
+    "app": "3d",
+    "title": "Hình chiếu",
+    "givens": [],
+    "goals": [],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "A",
+        "commands": [
+          "A=(1.0,2.0,3.0)"
+        ],
+        "expected_labels": [
+          "A"
+        ]
+      },
+      {
+        "source_step_id": "O",
+        "commands": [
+          "O=(0.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "O"
+        ]
+      },
+      {
+        "source_step_id": "X",
+        "commands": [
+          "X=(1.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "X"
+        ]
+      },
+      {
+        "source_step_id": "Y",
+        "commands": [
+          "Y=(0.0,1.0,0.0)"
+        ],
+        "expected_labels": [
+          "Y"
+        ]
+      },
+      {
+        "source_step_id": "base",
+        "commands": [
+          "base=Plane(O,X,Y)"
+        ],
+        "expected_labels": [
+          "base"
+        ]
+      },
+      {
+        "source_step_id": "H",
+        "commands": [
+          "ggbAux6=PerpendicularLine(A,base)",
+          "H=Intersect(ggbAux6,base)"
+        ],
+        "expected_labels": [
+          "ggbAux6",
+          "H"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Hình chiếu",
+      "app": "3d",
+      "givens": [],
+      "goals": [],
+      "display_choices": [],
+      "steps": [
+        {
+          "id": "A",
+          "op": "point",
+          "coords": [
+            1.0,
+            2.0,
+            3.0
+          ]
+        },
+        {
+          "id": "O",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "X",
+          "op": "point",
+          "coords": [
+            1.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Y",
+          "op": "point",
+          "coords": [
+            0.0,
+            1.0,
+            0.0
+          ]
+        },
+        {
+          "id": "base",
+          "op": "plane",
+          "points": [
+            "O",
+            "X",
+            "Y"
+          ]
+        },
+        {
+          "id": "H",
+          "op": "projection",
+          "point": "A",
+          "target": "base"
+        }
+      ]
+    }
+  },
+  "line-plane": {
+    "id": "a07a64bf-d1c7-555e-a7d5-6a4a71a169ea",
+    "version": 1,
+    "app": "3d",
+    "title": "Giao tuyến với mặt phẳng",
+    "givens": [],
+    "goals": [
+      "Tìm giao điểm I của đường thẳng d và mặt phẳng z=0"
+    ],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "A",
+        "commands": [
+          "A=(1.0,2.0,3.0)"
+        ],
+        "expected_labels": [
+          "A"
+        ]
+      },
+      {
+        "source_step_id": "B",
+        "commands": [
+          "B=(1.0,2.0,-1.0)"
+        ],
+        "expected_labels": [
+          "B"
+        ]
+      },
+      {
+        "source_step_id": "O",
+        "commands": [
+          "O=(0.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "O"
+        ]
+      },
+      {
+        "source_step_id": "X",
+        "commands": [
+          "X=(1.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "X"
+        ]
+      },
+      {
+        "source_step_id": "Y",
+        "commands": [
+          "Y=(0.0,1.0,0.0)"
+        ],
+        "expected_labels": [
+          "Y"
+        ]
+      },
+      {
+        "source_step_id": "d",
+        "commands": [
+          "d=Line(A,B)"
+        ],
+        "expected_labels": [
+          "d"
+        ]
+      },
+      {
+        "source_step_id": "base",
+        "commands": [
+          "base=Plane(O,X,Y)"
+        ],
+        "expected_labels": [
+          "base"
+        ]
+      },
+      {
+        "source_step_id": "I",
+        "commands": [
+          "I=Intersect(d,base)"
+        ],
+        "expected_labels": [
+          "I"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Giao tuyến với mặt phẳng",
+      "app": "3d",
+      "givens": [],
+      "goals": [
+        "Tìm giao điểm I của đường thẳng d và mặt phẳng z=0"
+      ],
+      "display_choices": [],
+      "steps": [
+        {
+          "id": "A",
+          "op": "point",
+          "coords": [
+            1.0,
+            2.0,
+            3.0
+          ]
+        },
+        {
+          "id": "B",
+          "op": "point",
+          "coords": [
+            1.0,
+            2.0,
+            -1.0
+          ]
+        },
+        {
+          "id": "O",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "X",
+          "op": "point",
+          "coords": [
+            1.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "Y",
+          "op": "point",
+          "coords": [
+            0.0,
+            1.0,
+            0.0
+          ]
+        },
+        {
+          "id": "d",
+          "a": "A",
+          "b": "B",
+          "op": "line"
+        },
+        {
+          "id": "base",
+          "op": "plane",
+          "points": [
+            "O",
+            "X",
+            "Y"
+          ]
+        },
+        {
+          "id": "I",
+          "a": "d",
+          "b": "base",
+          "op": "intersection"
+        }
+      ]
+    }
+  },
+  "undefined-intersection": {
+    "id": "43d8993a-71ad-5f5c-8379-c44fa42ba81a",
+    "version": 1,
+    "app": "3d",
+    "title": "Parallel",
+    "givens": [],
+    "goals": [],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "A",
+        "commands": [
+          "A=(0.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "A"
+        ]
+      },
+      {
+        "source_step_id": "B",
+        "commands": [
+          "B=(1.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "B"
+        ]
+      },
+      {
+        "source_step_id": "C",
+        "commands": [
+          "C=(0.0,1.0,0.0)"
+        ],
+        "expected_labels": [
+          "C"
+        ]
+      },
+      {
+        "source_step_id": "D",
+        "commands": [
+          "D=(1.0,1.0,0.0)"
+        ],
+        "expected_labels": [
+          "D"
+        ]
+      },
+      {
+        "source_step_id": "l1",
+        "commands": [
+          "l1=Line(A,B)"
+        ],
+        "expected_labels": [
+          "l1"
+        ]
+      },
+      {
+        "source_step_id": "l2",
+        "commands": [
+          "l2=Line(C,D)"
+        ],
+        "expected_labels": [
+          "l2"
+        ]
+      },
+      {
+        "source_step_id": "P",
+        "commands": [
+          "P=Intersect(l1,l2)"
+        ],
+        "expected_labels": [
+          "P"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Parallel",
+      "app": "3d",
+      "givens": [],
+      "goals": [],
+      "display_choices": [],
+      "steps": [
+        {
+          "id": "A",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "B",
+          "op": "point",
+          "coords": [
+            1.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "id": "C",
+          "op": "point",
+          "coords": [
+            0.0,
+            1.0,
+            0.0
+          ]
+        },
+        {
+          "id": "D",
+          "op": "point",
+          "coords": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        },
+        {
+          "id": "l1",
+          "a": "A",
+          "b": "B",
+          "op": "line"
+        },
+        {
+          "id": "l2",
+          "a": "C",
+          "b": "D",
+          "op": "line"
+        },
+        {
+          "id": "P",
+          "a": "l1",
+          "b": "l2",
+          "op": "intersection"
+        }
+      ]
+    }
+  },
+  "function2d": {
+    "id": "ca499aaa-b2f6-51ba-941d-15f0b893fc7a",
+    "version": 1,
+    "app": "graphing",
+    "title": "Sine",
+    "givens": [],
+    "goals": [],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "f",
+        "commands": [
+          "f(x)=If(-6.0<=x<=6.0,sin(x))"
+        ],
+        "expected_labels": [
+          "f"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Sine",
+      "app": "graphing",
+      "givens": [],
+      "goals": [],
+      "display_choices": [],
+      "steps": [
+        {
+          "id": "f",
+          "op": "function2d",
+          "expression": "sin(x)",
+          "domain": [
+            -6.0,
+            6.0
+          ]
+        }
+      ]
+    }
+  },
+  "surface": {
+    "id": "d9c0348b-5780-5e15-b76c-4344501f0dcc",
+    "version": 1,
+    "app": "3d",
+    "title": "Saddle",
+    "givens": [],
+    "goals": [],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "s",
+        "commands": [
+          "s=Surface(u,v,((u ^ 2) - (v ^ 2)),u,-3.0,3.0,v,-3.0,3.0)"
+        ],
+        "expected_labels": [
+          "s"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Saddle",
+      "app": "3d",
+      "givens": [],
+      "goals": [],
+      "display_choices": [],
+      "steps": [
+        {
+          "id": "s",
+          "op": "surface_explicit",
+          "expression": "x^2-y^2",
+          "x_domain": [
+            -3.0,
+            3.0
+          ],
+          "y_domain": [
+            -3.0,
+            3.0
+          ]
+        }
+      ]
+    }
+  }
+}

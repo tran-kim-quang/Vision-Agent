@@ -285,4 +285,46 @@ Viewer hình học không gian 3D tương tác (three.js): spec ngữ nghĩa →
 - API: `GET /geometry/presets`, `GET /geometry/presets/{id}`, `POST /geometry/build`
 - Mã nguồn: package `geometry3d/` (kernel + validator + preset SGK Toán 12), kiểm thử: `python tests/test_geometry3d.py`
 
+## GeoGebra construction agent
+
+Luồng GeoGebra nhận yêu cầu hình học hoặc đồ thị hàm số, giao cho `geometry_agent` trích xuất giả thiết và quan hệ, kiểm tra một spec có kiểu, rồi gửi artifact hoàn chỉnh tới frontend. GeoGebra chỉ được tải khi người dùng bấm **Mở hình**. Ví dụ:
+
+- `Vẽ tứ diện ABCD, M và N là trung điểm AB và AC.`
+- `Vẽ hình chiếu vuông góc của A(1,2,3) lên mặt phẳng z=0.`
+- `Vẽ đồ thị sin(x) trên [-6,6].`
+- `Vẽ mặt z=x^2-y^2 với x,y thuộc [-3,3].`
+
+Có thể chọn model riêng trong `.env`; nếu bỏ trống, geometry agent dùng model của supervisor:
+
+```env
+GEOMETRY_MODEL_NAME=gemma4:31b-cloud
+```
+
+Chạy backend và frontend khi phát triển:
+
+```bash
+uvicorn api:app --reload --port 8000
+cd frontend
+npm install
+npm run dev
+```
+
+Các lệnh kiểm thử:
+
+```bash
+python -m unittest discover -s tests -p 'test_geogebra_*.py' -v
+python tests/test_geometry3d.py
+cd frontend
+npm run test:unit
+npm run test:e2e
+npm run test:e2e:real
+npm run build
+```
+
+Mỗi artifact thuộc một lượt chat và tồn tại trong bộ nhớ của phiên frontend. Khi đóng workspace, XML hiện tại được giữ để mở lại vẫn còn chỉnh sửa của người dùng; **New chat** xóa cache đó và hủy stream đang chạy. Nếu stream ngắt sau khi artifact đã tới, thẻ hình vẫn được giữ. Nếu GeoGebra từ chối lệnh hoặc tạo đối tượng không xác định, viewer dừng tại bước lỗi và cho phép thử lại.
+
+Hình dựng là công cụ minh họa và khám phá. Agent không xác nhận rằng mục tiêu hình học đã được chứng minh. Luồng Three.js cũ tại `/geo3d/` và các API `/geometry/*` vẫn hoạt động riêng, không dùng artifact GeoGebra.
+
+Frontend nhúng script chính thức `deployggb.js`. GeoGebra cho phép sử dụng phi thương mại theo giấy phép của họ; mục đích thương mại cần thỏa thuận giấy phép riêng, vì vậy phải kiểm tra điều khoản theo cách triển khai thực tế. Tham khảo [GeoGebra Apps Embedding](https://geogebra.github.io/docs/reference/en/GeoGebra_Apps_Embedding/), [Apps API](https://geogebra.github.io/docs/reference/en/GeoGebra_Apps_API/), [Function](https://geogebra.github.io/docs/manual/en/commands/Function/), [Surface](https://geogebra.github.io/docs/manual/en/commands/Surface/) và [GeoGebra license](https://www.geogebra.org/license).
+
 

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "title": "Giao tuyến với mặt phẳng",
+  "app": "3d",
+  "givens": [],
+  "goals": ["Tìm giao điểm I của đường thẳng d và mặt phẳng z=0"],
+  "display_choices": [],
+  "steps": [
+    {"id": "A", "op": "point", "coords": [1, 2, 3]},
+    {"id": "B", "op": "point", "coords": [1, 2, -1]},
+    {"id": "O", "op": "point", "coords": [0, 0, 0]},
+    {"id": "X", "op": "point", "coords": [1, 0, 0]},
+    {"id": "Y", "op": "point", "coords": [0, 1, 0]},
+    {"id": "d", "op": "line", "a": "A", "b": "B"},
+    {"id": "base", "op": "plane", "points": ["O", "X", "Y"]},
+    {"id": "I", "op": "intersection", "a": "d", "b": "base"}
+  ]
+}

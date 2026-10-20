@@ -76,12 +76,13 @@ def compile_construction(validated: ValidatedConstruction) -> GeometryArtifact:
             if target_kind == "line":
                 commands = [f"{step.id}=ClosestPoint({step.target},{step.point})"]
             else:
-                helper = f"__ggb_{step.id}_perp"
+                helper = f"ggbAux{len(command_steps) + 1}"
                 commands = [f"{helper}=PerpendicularLine({step.point},{step.target})", f"{step.id}=Intersect({helper},{step.target})"]
                 expected = [helper, step.id]
         elif step.op == "function2d":
             expression = _expression(parse_expression(step.expression, frozenset({"x"})))
-            commands = [f"{step.id}=Function({expression},{_number(step.domain[0])},{_number(step.domain[1])})"]
+            start, end = (_number(step.domain[0]), _number(step.domain[1]))
+            commands = [f"{step.id}(x)=If({start}<=x<={end},{expression})"]
         elif step.op == "surface_explicit":
             expression = _expression(parse_expression(step.expression, frozenset({"x", "y"})), {"x": "u", "y": "v"})
             commands = [f"{step.id}=Surface(u,v,{expression},u,{_number(step.x_domain[0])},{_number(step.x_domain[1])},v,{_number(step.y_domain[0])},{_number(step.y_domain[1])})"]
