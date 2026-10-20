@@ -75,7 +75,7 @@ def validate_spec(raw: dict) -> ValidatedConstruction:
     for step in spec.steps:
         if step.id in by_id:
             raise SpecError("duplicate_id", step.id, f"duplicate step id {step.id!r}")
-        if step.id.lower() in RESERVED or step.id.startswith("__ggb_"):
+        if step.id in RESERVED or step.id.startswith("__ggb_"):
             raise SpecError("reserved_id", step.id, f"reserved step id {step.id!r}")
         by_id[step.id] = step
 
