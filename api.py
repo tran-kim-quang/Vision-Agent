@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from geometry3d import PRESETS, build_solid
+from geometry3d.geogebra.streaming import artifact_event
 from langchain_core.messages import AIMessageChunk, ToolMessage
 from pydantic import BaseModel, Field
 
@@ -109,12 +110,16 @@ def _is_transfer_message(msg) -> bool:
 
 # ── SSE stream ─────────────────────────────────────────────────────────────────
 async def event_stream(message: str, session_id: str, supervisor):
+    request_id = str(uuid.uuid4())
     config = {
         "recursion_limit": 50,
-        "configurable": {"thread_id": session_id},
+        "configurable": {"thread_id": session_id, "geometry_request_id": request_id},
     }
     seen_agents: set[str] = set()
+    seen_geometry_calls: set[str] = set()
     supervisor_text_sent = False
+
+    yield f"data: {json.dumps({'type': 'request_start', 'session_id': session_id, 'request_id': request_id})}\n\n"
 
     def _start(agent: str) -> str | None:
         if agent not in seen_agents:
@@ -163,6 +168,16 @@ async def event_stream(message: str, session_id: str, supervisor):
                             _dbg("  → supervisor_text_sent reset to False")
                         yield f"data: {json.dumps({'type': 'handoff', 'agent': agent, 'tool': tool_name, 'target': _handoff_target(tool_name)})}\n\n"
                     else:
+                        geometry = artifact_event(
+                            tool_name,
+                            str(chunk.content),
+                            str(getattr(chunk, "tool_call_id", "")),
+                            session_id,
+                            request_id,
+                            seen_geometry_calls,
+                        )
+                        if geometry:
+                            yield f"data: {json.dumps(geometry, ensure_ascii=False)}\n\n"
                         yield f"data: {json.dumps({'type': 'tool_result', 'agent': agent, 'tool': tool_name, 'content': str(chunk.content)[:1000]})}\n\n"
 
                 elif isinstance(chunk, AIMessageChunk):
