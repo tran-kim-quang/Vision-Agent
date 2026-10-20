@@ -1,6 +1,7 @@
 import os
 
 from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 
 
 def _ollama_base_url() -> str:
@@ -10,7 +11,12 @@ def _ollama_base_url() -> str:
     return base_url
 
 
-def build_ollama_chat_model(model: str) -> ChatOllama:
+def build_ollama_chat_model(model: str) -> ChatOllama | ChatOpenAI:
+    river_key = os.getenv("RIVERAI_API_KEY", "").strip()
+    river_base_url = os.getenv("RIVERAI_BASE_URL", "").strip()
+    if river_key and river_base_url:
+        return ChatOpenAI(model=model, api_key=river_key, base_url=river_base_url.rstrip("/"))
+
     api_key = os.getenv("OLLAMA_API_KEY", "")
     client_kwargs = {}
     if api_key and api_key != "ollama":
