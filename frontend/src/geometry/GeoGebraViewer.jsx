@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 
 import { loadGeoGebra } from './loader'
-import { executeArtifact, verifyArtifactLabels } from './runtime'
+import { applyArtifactDisplay, executeArtifact, verifyArtifactLabels } from './runtime'
 
 
 const READY_TIMEOUT_MS = 20000
@@ -20,6 +20,7 @@ export default function GeoGebraViewer({ artifact, stateCache, onClose }) {
     let api = null
     let applet = null
     let readyTimer = null
+    let resizeObserver = null
     const isCurrent = () => active && epochRef.current === epoch
 
     setStatus('loading')
@@ -32,11 +33,25 @@ export default function GeoGebraViewer({ artifact, stateCache, onClose }) {
           setError(new Error('GeoGebra initialization timed out'))
         }
       }, READY_TIMEOUT_MS)
+      // The artifact's graphing mode denotes 2D. GeoGebra's Graphing Calculator
+      // disables geometric commands (e.g. Midpoint); Geometry supports these
+      // and function plots together. Keep Graphing for function-only figures.
+      const planarConstruction = artifact.app === 'graphing'
+        && artifact.spec?.steps.some(step => step.op !== 'function2d')
+      const container = document.getElementById(containerId)
+      const resize = () => {
+        if (!isCurrent() || !container) return
+        const { clientWidth: width, clientHeight: height } = container
+        if (width > 0 && height > 0) api?.setSize?.(width, height)
+      }
       applet = new GGBApplet({
         id: containerId,
-        appName: artifact.app,
-        width: 900,
-        height: 620,
+        appName: planarConstruction ? 'geometry' : artifact.app,
+        showAxes: true,
+        width: container?.clientWidth || 900,
+        height: container?.clientHeight || 620,
+        // ResizeObserver sets real dimensions; avoid deployggb scaling them again.
+        disableAutoScale: true,
         showToolBar: true,
         showAlgebraInput: true,
         showMenuBar: false,
@@ -49,8 +64,12 @@ export default function GeoGebraViewer({ artifact, stateCache, onClose }) {
           }
           clearTimeout(readyTimer)
           api = loadedApi
-          const container = document.getElementById(containerId)
           if (container) container.__geogebraApi = loadedApi
+          resize()
+          if (container && typeof ResizeObserver === 'function') {
+            resizeObserver = new ResizeObserver(resize)
+            resizeObserver.observe(container)
+          }
           setStatus('executing')
           try {
             const snapshot = stateCache.get(artifact.id)
@@ -62,9 +81,11 @@ export default function GeoGebraViewer({ artifact, stateCache, onClose }) {
                 stateCache.delete(artifact.id)
                 api.setXML('<geogebra format="5.0"></geogebra>')
                 await executeArtifact(api, artifact, { isCurrent })
+                applyArtifactDisplay(api, artifact)
               }
             } else {
               await executeArtifact(api, artifact, { isCurrent })
+              applyArtifactDisplay(api, artifact)
             }
             if (isCurrent()) setStatus('ready')
           } catch (cause) {
@@ -86,6 +107,7 @@ export default function GeoGebraViewer({ artifact, stateCache, onClose }) {
     return () => {
       active = false
       clearTimeout(readyTimer)
+      resizeObserver?.disconnect()
       if (api) {
         try {
           const xml = api.getXML?.()
@@ -105,7 +127,10 @@ export default function GeoGebraViewer({ artifact, stateCache, onClose }) {
   return (
     <section className="geogebra-viewer" aria-label={`Hình GeoGebra: ${artifact.title}`}>
       <div className="geogebra-toolbar">
-        <span>{status === 'ready' ? 'Hình đã hiển thị' : status === 'executing' ? 'Đang dựng hình…' : status === 'error' ? 'Không thể dựng hình' : 'Đang tải GeoGebra…'}</span>
+        <div className="geogebra-heading">
+          <strong className="geogebra-title" title={artifact.title}>{artifact.title}</strong>
+          <span>{status === 'ready' ? 'Hình đã hiển thị' : status === 'executing' ? 'Đang dựng hình…' : status === 'error' ? 'Không thể dựng hình' : 'Đang tải GeoGebra…'}</span>
+        </div>
         <button type="button" onClick={onClose}>Đóng</button>
       </div>
       {status === 'error' && (

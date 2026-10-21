@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "title": "Mặt cầu và tiếp tuyến theo phương Oy",
+  "app": "3d",
+  "givens": [{"text": "Chọn ví dụ mặt cầu và đường tiếp tuyến theo phương cho trước", "source_text": "bài toán mặt cầu, giúp mình tạo ra 1 phương trình ví dụ nào cũng được, tiếp tuyến có phương cho trước, mục tiêu là cả phương trình và hình vẽ"}],
+  "goals": ["Minh họa x^2+y^2+z^2=4 và tiếp tuyến (x,y,z)=(2,0,0)+t(0,1,0)"],
+  "display_choices": ["Chọn tâm O(0,0,0), bán kính 2, tiếp điểm M(2,0,0) và phương (0,1,0)"],
+  "steps": [
+    {"id": "O", "op": "point", "coords": [0,0,0]},
+    {"id": "M", "op": "point", "coords": [2,0,0]},
+    {"id": "Q", "op": "point", "coords": [2,1,0]},
+    {"id": "ball", "op": "sphere", "center": "O", "radius": 2},
+    {"id": "tangent", "op": "line", "a": "M", "b": "Q"}
+  ]
+}

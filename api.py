@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 import uuid
@@ -25,6 +26,7 @@ _REDIS_URL    = os.getenv("REDIS_URL", "")
 _DEBUG        = os.getenv("DEBUG_STREAM", "false").lower() == "true"
 _UPLOAD_DIR   = Path("assets/uploads")
 _ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+_logger = logging.getLogger('uvicorn.error')
 
 
 def _dbg(*args):
@@ -177,6 +179,13 @@ async def event_stream(message: str, session_id: str, supervisor):
                             seen_geometry_calls,
                         )
                         if geometry:
+                            artifact = geometry['artifact']
+                            _logger.info('geometry_prepared %s', json.dumps({
+                                'request_id': request_id, 'artifact_id': artifact['id'], 'app': artifact['app'],
+                                'steps': artifact['steps'],
+                                'fills': [{'id': step['id'], 'fill_opacity': step['fill_opacity']}
+                                          for step in artifact['spec']['steps'] if step.get('fill_opacity') is not None],
+                            }, ensure_ascii=False))
                             yield f"data: {json.dumps(geometry, ensure_ascii=False)}\n\n"
                         yield f"data: {json.dumps({'type': 'tool_result', 'agent': agent, 'tool': tool_name, 'content': str(chunk.content)[:1000]})}\n\n"
 

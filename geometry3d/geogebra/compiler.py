@@ -8,7 +8,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from .expressions import ExpressionNode, parse_expression
-from .schema import ConstructionSpec, Given
+from .schema import ConstructionSpec, Given, ReferenceArgument, NumberArgument, BooleanArgument, ExpressionArgument, ListArgument
 from .validation import ValidatedConstruction
 
 
@@ -57,8 +57,11 @@ def compile_construction(validated: ValidatedConstruction) -> GeometryArtifact:
     for step in validated.steps:
         commands: list[str]
         expected = [step.id]
-        if step.op == "point":
-            commands = [f"{step.id}=({_number(step.coords[0])},{_number(step.coords[1])},{_number(step.coords[2])})"]
+        if step.op == 'command':
+            commands = [f"{step.id}={step.name}({','.join(_argument(arg) for arg in step.args)})"]
+        elif step.op == "point":
+            coords = step.coords[:2] if validated.spec.app == "graphing" else step.coords
+            commands = [f"{step.id}=({','.join(_number(value) for value in coords)})"]
         elif step.op == "segment":
             commands = [f"{step.id}=Segment({step.a},{step.b})"]
         elif step.op == "line":
@@ -67,6 +70,9 @@ def compile_construction(validated: ValidatedConstruction) -> GeometryArtifact:
             commands = [f"{step.id}=Polygon({','.join(step.points)})"]
         elif step.op == "plane":
             commands = [f"{step.id}=Plane({','.join(step.points)})"]
+        elif step.op == "sphere":
+            radius_or_point = _number(step.radius) if step.radius is not None else step.through
+            commands = [f"{step.id}=Sphere({step.center},{radius_or_point})"]
         elif step.op == "midpoint":
             commands = [f"{step.id}=Midpoint({step.a},{step.b})"]
         elif step.op == "intersection":
@@ -92,3 +98,17 @@ def compile_construction(validated: ValidatedConstruction) -> GeometryArtifact:
 
     spec = validated.spec
     return GeometryArtifact(app=spec.app, title=spec.title, givens=spec.givens, goals=spec.goals, display_choices=spec.display_choices, steps=command_steps, spec=spec)
+
+
+def _argument(argument) -> str:
+    if isinstance(argument, ReferenceArgument):
+        return argument.ref
+    if isinstance(argument, NumberArgument):
+        return _number(argument.number)
+    if isinstance(argument, BooleanArgument):
+        return 'true' if argument.boolean else 'false'
+    if isinstance(argument, ExpressionArgument):
+        return _expression(parse_expression(argument.expression, frozenset({'x', 'y', 'z', 'u', 'v'})))
+    if isinstance(argument, ListArgument):
+        return '{' + ','.join(_argument(item) for item in argument.items) + '}'
+    raise ValueError('unsupported command argument')

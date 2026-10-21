@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "title": "Hình nón từ lệnh tra trong manual",
+  "app": "3d",
+  "givens": [],
+  "goals": ["Dựng hình nón có chiều cao 4, bán kính 2"],
+  "display_choices": [],
+  "steps": [
+    {"id":"O","op":"point","coords":[0,0,0]},
+    {"id":"S","op":"point","coords":[0,0,4]},
+    {"id":"solid","op":"command","name":"Cone","args":[{"ref":"O"},{"ref":"S"},{"number":2}],"caption":"Hình nón","fill_opacity":0.3}
+  ]
+}

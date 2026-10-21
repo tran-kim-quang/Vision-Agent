@@ -16,7 +16,7 @@ from geometry3d.geogebra.validation import validate_spec  # noqa: E402
 
 FIXTURE_DIR = ROOT / "tests" / "fixtures" / "geogebra"
 OUTPUT = ROOT / "frontend" / "e2e" / "fixtures" / "compiled-artifacts.json"
-NAMES = ("tetrahedron", "projection", "line-plane", "undefined-intersection", "function2d", "surface")
+NAMES = ("tetrahedron", "projection", "line-plane", "undefined-intersection", "function2d", "surface", "vertical2d", "sphere", "integral-region", "documented-cone")
 
 
 def export() -> None:

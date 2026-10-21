@@ -13,6 +13,12 @@ def fixture(name):
 
 
 class ToolTests(unittest.TestCase):
+    def test_sphere_returns_an_executable_surface_artifact(self):
+        result = prepare_geometry(fixture("sphere.json"))
+        self.assertEqual(result["status"], "prepared")
+        sphere = next(s for s in result["artifact"]["steps"] if s["source_step_id"] == "ball")
+        self.assertEqual(sphere["commands"], ["ball=Sphere(O,2.0)"])
+
     def test_tool_returns_structured_errors(self):
         result = prepare_geometry({"version": 1, "title": "broken", "app": "3d", "givens": [], "goals": [], "display_choices": [], "steps": [{"id":"M","op":"midpoint","a":"A","b":"B"}]})
         self.assertEqual(result["status"], "invalid_spec")

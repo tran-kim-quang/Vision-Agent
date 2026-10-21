@@ -7,10 +7,11 @@ from dataclasses import dataclass
 from pydantic import ValidationError
 
 from .expressions import ExpressionError, parse_expression
-from .schema import ConstructionSpec, Step
+from .schema import ConstructionSpec, PointStep, Step
+from .commands import command_references, validate_command
 
 
-RESERVED = frozenset({"x", "y", "z", "u", "v", "e", "pi", "sin", "cos", "tan", "exp", "log", "sqrt", "abs", "point", "segment", "line", "polygon", "plane", "midpoint", "intersection", "projection", "function2d", "surface_explicit"})
+RESERVED = frozenset({"x", "y", "z", "u", "v", "e", "pi", "sin", "cos", "tan", "exp", "log", "sqrt", "abs", "point", "segment", "line", "polygon", "plane", "midpoint", "intersection", "projection", "function2d", "surface_explicit", "sphere"})
 
 
 class SpecError(ValueError):
@@ -28,21 +29,27 @@ class ValidatedConstruction:
 
 
 def _references(step: Step) -> tuple[str, ...]:
+    if step.op == "command":
+        return command_references(step)
     if step.op in {"segment", "line", "midpoint", "intersection"}:
         return (step.a, step.b)
     if step.op in {"polygon", "plane"}:
         return tuple(step.points)
     if step.op == "projection":
         return (step.point, step.target)
+    if step.op == "sphere":
+        return (step.center, step.through) if step.through is not None else (step.center,)
     return ()
 
 
 def _output_kind(step: Step, kinds: dict[str, str]) -> str:
+    if step.op == 'command':
+        return 'object'  # GeoGebra validates the dynamic output type at execution.
     if step.op in {"point", "midpoint", "projection"}:
         return "point"
     if step.op in {"segment", "line"}:
         return step.op
-    if step.op in {"polygon", "plane", "function2d", "surface_explicit"}:
+    if step.op in {"polygon", "plane", "function2d", "surface_explicit", "sphere"}:
         return step.op
     pair = {kinds[step.a], kinds[step.b]}
     if pair == {"plane"}:
@@ -77,6 +84,11 @@ def validate_spec(raw: dict) -> ValidatedConstruction:
             raise SpecError("duplicate_id", step.id, f"duplicate step id {step.id!r}")
         if step.id in RESERVED or step.id.startswith("ggbAux"):
             raise SpecError("reserved_id", step.id, f"reserved step id {step.id!r}")
+        if step.op == 'command':
+            try:
+                validate_command(step)
+            except (OSError, ValueError, KeyError) as exc:
+                raise SpecError('invalid_command', step.id, str(exc)) from exc
         by_id[step.id] = step
 
     dependencies: dict[str, set[str]] = {}
@@ -104,12 +116,31 @@ def validate_spec(raw: dict) -> ValidatedConstruction:
         if step.op in {"segment", "line", "midpoint"}:
             _require(step, kinds, step.a, {"point"})
             _require(step, kinds, step.b, {"point"})
+            if step.op == "line":
+                a, b = by_id[step.a], by_id[step.b]
+                same_coords = (
+                    isinstance(a, PointStep) and isinstance(b, PointStep)
+                    and (*a.coords[:2], a.coords[2] if len(a.coords) == 3 else 0)
+                    == (*b.coords[:2], b.coords[2] if len(b.coords) == 3 else 0)
+                )
+                if step.a == step.b or same_coords:
+                    raise SpecError("degenerate_line", step.id, "a line requires two distinct points; choose a second point along its direction")
         elif step.op in {"polygon", "plane"}:
             for ref in step.points:
                 _require(step, kinds, ref, {"point"})
         elif step.op == "projection":
             _require(step, kinds, step.point, {"point"})
             _require(step, kinds, step.target, {"line", "plane"})
+        elif step.op == "sphere":
+            _require(step, kinds, step.center, {"point"})
+            if step.through is not None:
+                _require(step, kinds, step.through, {"point"})
+                center, through = by_id[step.center], by_id[step.through]
+                if step.center == step.through or (
+                    isinstance(center, PointStep) and isinstance(through, PointStep)
+                    and center.coords == through.coords
+                ):
+                    raise SpecError("degenerate_sphere", step.id, "the point on a sphere must differ from its center")
         elif step.op == "intersection":
             pair = {kinds[step.a], kinds[step.b]}
             if pair not in ({"line"}, {"line", "plane"}, {"plane"}):

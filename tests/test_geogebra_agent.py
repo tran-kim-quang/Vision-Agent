@@ -42,6 +42,52 @@ def invoke(model, request_id="req-1"):
 
 
 class GeometryAgentTests(unittest.TestCase):
+    def test_documentation_tools_return_relevant_syntax_before_preparation(self):
+        class ReadingModel(FakeModel):
+            def invoke(self, messages, config=None):
+                if self.calls == 1:
+                    result = json.loads(messages[-1].content)
+                    self_result = [item["command"] for item in result["results"]]
+                    assert "Sphere" in self_result
+                if self.calls == 2:
+                    result = json.loads(messages[-1].content)
+                    assert "Sphere( <Point>, <Radius> )" in result["content"]
+                return super().invoke(messages, config)
+
+        model = ReadingModel([
+            AIMessage(content="", tool_calls=[call("find", {"query":"sphere center radius"}, "search_geogebra_docs")]),
+            AIMessage(content="", tool_calls=[call("read", {"command":"Sphere"}, "get_command_docs")]),
+            AIMessage(content="", tool_calls=[call("prepare", {"spec":VALID_SPEC})]),
+        ])
+        state = invoke(model)
+        tools = [m for m in state["messages"] if isinstance(m, ToolMessage)]
+        self.assertEqual([m.name for m in tools], ["search_geogebra_docs", "get_command_docs", "prepare_geometry"])
+        self.assertEqual(json.loads(tools[-1].content)["status"], "prepared")
+        self.assertEqual(state["geometry_attempts"], 1)
+        self.assertEqual(state["geometry_docs_calls"], 2)
+
+    def test_documentation_loop_is_bounded_independently_of_preparation(self):
+        model = FakeModel([AIMessage(content="", tool_calls=[call(str(i), {"query":"sphere"}, "search_geogebra_docs")]) for i in range(10)])
+        state = invoke(model)
+        self.assertEqual(state["geometry_attempts"], 0)
+        last = state["messages"][-1]
+        self.assertEqual(json.loads(last.content)["issues"][0]["code"], "documentation_limit")
+        self.assertLessEqual(model.calls, 9)
+
+    def test_new_request_resets_documentation_budget(self):
+        responses = []
+        for index in range(2):
+            responses.extend([
+                AIMessage(content="", tool_calls=[call(f"search-{index}", {"query":"Sphere"}, "search_geogebra_docs")]),
+                AIMessage(content="", tool_calls=[call(f"prepare-{index}", {"spec":VALID_SPEC})]),
+            ])
+        graph = build_geometry_agent(FakeModel(responses))
+        first = graph.invoke({"messages":[HumanMessage(content="first")]}, {"configurable":{"geometry_request_id":"first"}})
+        second = graph.invoke({**first, "messages":[*first["messages"], HumanMessage(content="second")]}, {"configurable":{"geometry_request_id":"second"}})
+        self.assertEqual(second["geometry_docs_calls"], 1)
+        self.assertEqual(second["geometry_attempts"], 1)
+        self.assertEqual(json.loads(second["messages"][-1].content)["status"], "prepared")
+
     def test_model_receives_the_construction_contract(self):
         description = PrepareGeometryInput.model_json_schema()["properties"]["spec"]["description"]
         for term in ("surface_explicit", "function2d", "coords", "source_text"):

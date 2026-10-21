@@ -30,6 +30,42 @@ export function verifyArtifactLabels(api, artifact, { isCurrent = () => true } =
   }
 }
 
+export function applyArtifactDisplay(api, artifact) {
+  if (artifact.app === 'graphing') {
+    api.setAxesVisible?.(true, true)
+    api.setGridVisible?.(true)
+    api.setAxisLabels?.(1, 'x', 'y', '')
+  }
+  for (const step of artifact.spec?.steps ?? []) {
+    const caption = step.caption?.trim()
+    api.setLabelStyle?.(step.id, caption ? 3 : 0)
+    if (caption) {
+      api.setCaption?.(step.id, caption)
+      api.setLabelVisible?.(step.id, true)
+    }
+    if (step.op === 'sphere') {
+      api.setColor?.(step.id, 37, 99, 235)
+      api.setFilling?.(step.id, 0.25)
+      api.setLabelVisible?.(step.id, true)
+    }
+    if (['line', 'segment', 'function2d'].includes(step.op)) {
+      api.setColor?.(step.id, 37, 99, 235)
+      api.setLineThickness?.(step.id, 5)
+      api.setLabelVisible?.(step.id, true)
+    }
+    if (step.fill_opacity != null) {
+      api.setColor?.(step.id, 245, 158, 11)
+      api.setFilling?.(step.id, step.fill_opacity)
+      api.setVisible?.(step.id, true)
+      const actual = api.getFilling?.(step.id)
+      if ((actual != null && (!Number.isFinite(actual) || Math.abs(actual - step.fill_opacity) > 1e-6))
+        || (step.fill_opacity > 0 && api.getVisible?.(step.id) === false)) {
+        throw new GeometryRuntimeError(`GeoGebra did not apply the requested fill for ${step.id}`, step.id)
+      }
+    }
+  }
+}
+
 export async function executeArtifact(api, artifact, { isCurrent = () => true } = {}) {
   for (const step of artifact.steps ?? []) {
     for (const command of step.commands ?? []) {

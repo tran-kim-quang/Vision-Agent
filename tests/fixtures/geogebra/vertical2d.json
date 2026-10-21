@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "title": "Đường thẳng qua A(2,0) song song Oy",
+  "app": "graphing",
+  "givens": [{"text": "d qua A(2,0) và song song Oy", "source_text": "Vẽ đường thẳng d qua A(2,0) song song trục tung"}],
+  "goals": ["Đánh dấu giao điểm I với Ox"],
+  "display_choices": ["B(2,1) xác định hướng Oy; O và X xác định Ox"],
+  "steps": [
+    {"id": "A", "op": "point", "coords": [2,0]},
+    {"id": "B", "op": "point", "coords": [2,1]},
+    {"id": "O", "op": "point", "coords": [0,0]},
+    {"id": "X", "op": "point", "coords": [1,0]},
+    {"id": "d", "op": "line", "a": "A", "b": "B"},
+    {"id": "ox", "op": "line", "a": "O", "b": "X"},
+    {"id": "I", "op": "intersection", "a": "d", "b": "ox"},
+    {"id": "M", "op": "midpoint", "a": "A", "b": "B"},
+    {"id": "H", "op": "projection", "point": "B", "target": "ox"},
+    {"id": "s", "op": "segment", "a": "O", "b": "B"},
+    {"id": "triangle", "op": "polygon", "points": ["O", "A", "B"]},
+    {"id": "f", "op": "function2d", "expression": "x^2", "domain": [-3,3]}
+  ]
+}
