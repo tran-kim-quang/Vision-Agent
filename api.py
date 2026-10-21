@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 import uuid
@@ -12,6 +13,10 @@ load_dotenv(Path(__file__).with_name(".env"), override=True)
 from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
+
+from geometry3d import PRESETS, build_solid
+from geometry3d.geogebra.streaming import artifact_event
 from langchain_core.messages import AIMessageChunk, ToolMessage
 from pydantic import BaseModel, Field
 
@@ -21,6 +26,7 @@ _REDIS_URL    = os.getenv("REDIS_URL", "")
 _DEBUG        = os.getenv("DEBUG_STREAM", "false").lower() == "true"
 _UPLOAD_DIR   = Path("assets/uploads")
 _ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+_logger = logging.getLogger('uvicorn.error')
 
 
 def _dbg(*args):
@@ -106,12 +112,16 @@ def _is_transfer_message(msg) -> bool:
 
 # ── SSE stream ─────────────────────────────────────────────────────────────────
 async def event_stream(message: str, session_id: str, supervisor):
+    request_id = str(uuid.uuid4())
     config = {
         "recursion_limit": 50,
-        "configurable": {"thread_id": session_id},
+        "configurable": {"thread_id": session_id, "geometry_request_id": request_id},
     }
     seen_agents: set[str] = set()
+    seen_geometry_calls: set[str] = set()
     supervisor_text_sent = False
+
+    yield f"data: {json.dumps({'type': 'request_start', 'session_id': session_id, 'request_id': request_id})}\n\n"
 
     def _start(agent: str) -> str | None:
         if agent not in seen_agents:
@@ -160,6 +170,23 @@ async def event_stream(message: str, session_id: str, supervisor):
                             _dbg("  → supervisor_text_sent reset to False")
                         yield f"data: {json.dumps({'type': 'handoff', 'agent': agent, 'tool': tool_name, 'target': _handoff_target(tool_name)})}\n\n"
                     else:
+                        geometry = artifact_event(
+                            tool_name,
+                            str(chunk.content),
+                            str(getattr(chunk, "tool_call_id", "")),
+                            session_id,
+                            request_id,
+                            seen_geometry_calls,
+                        )
+                        if geometry:
+                            artifact = geometry['artifact']
+                            _logger.info('geometry_prepared %s', json.dumps({
+                                'request_id': request_id, 'artifact_id': artifact['id'], 'app': artifact['app'],
+                                'steps': artifact['steps'],
+                                'fills': [{'id': step['id'], 'fill_opacity': step['fill_opacity']}
+                                          for step in artifact['spec']['steps'] if step.get('fill_opacity') is not None],
+                            }, ensure_ascii=False))
+                            yield f"data: {json.dumps(geometry, ensure_ascii=False)}\n\n"
                         yield f"data: {json.dumps({'type': 'tool_result', 'agent': agent, 'tool': tool_name, 'content': str(chunk.content)[:1000]})}\n\n"
 
                 elif isinstance(chunk, AIMessageChunk):
@@ -277,3 +304,38 @@ async def get_history(session_id: str, req: Request):
         }
     except Exception as exc:
         return {"session_id": session_id, "error": str(exc)}
+
+
+# ── 3D Geometry Viewer (module: geometry3d) ────────────────────────────────
+# Spec -> kernel -> validation gate -> render data. The viewer never
+# receives coordinates that have not passed build_solid's checks.
+
+class GeometryBuildRequest(BaseModel):
+    kind: str
+    params: dict = {}
+    claims: list = []
+
+
+@app.get("/geometry/presets")
+async def geometry_presets():
+    return {"presets": [{"id": p["id"], "title": p["title"]} for p in PRESETS]}
+
+
+@app.get("/geometry/presets/{preset_id}")
+async def geometry_preset(preset_id: str):
+    for p in PRESETS:
+        if p["id"] == preset_id:
+            return {"id": p["id"], "title": p["title"], **build_solid(p["spec"])}
+    return {"ok": False, "error": f"preset not found: {preset_id}"}
+
+
+@app.post("/geometry/build")
+async def geometry_build(req: GeometryBuildRequest):
+    return build_solid(req.model_dump())
+
+
+app.mount(
+    "/geo3d",
+    StaticFiles(directory=Path(__file__).with_name("static") / "geo3d", html=True),
+    name="geo3d",
+)

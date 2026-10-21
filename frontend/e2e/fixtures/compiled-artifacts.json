@@ -1,0 +1,1300 @@
+{
+  "tetrahedron": {
+    "id": "7ff23cde-ed5a-5984-b8c2-b191f7b1e897",
+    "version": 1,
+    "app": "3d",
+    "title": "Tứ diện ABCD",
+    "givens": [
+      {
+        "text": "ABCD là tứ diện",
+        "source_text": "Cho tứ diện ABCD"
+      }
+    ],
+    "goals": [
+      "MN song song BC"
+    ],
+    "display_choices": [
+      "Dùng một cấu hình không suy biến để minh họa"
+    ],
+    "steps": [
+      {
+        "source_step_id": "A",
+        "commands": [
+          "A=(0.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "A"
+        ]
+      },
+      {
+        "source_step_id": "B",
+        "commands": [
+          "B=(4.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "B"
+        ]
+      },
+      {
+        "source_step_id": "C",
+        "commands": [
+          "C=(0.0,4.0,0.0)"
+        ],
+        "expected_labels": [
+          "C"
+        ]
+      },
+      {
+        "source_step_id": "D",
+        "commands": [
+          "D=(1.0,1.0,3.0)"
+        ],
+        "expected_labels": [
+          "D"
+        ]
+      },
+      {
+        "source_step_id": "M",
+        "commands": [
+          "M=Midpoint(A,B)"
+        ],
+        "expected_labels": [
+          "M"
+        ]
+      },
+      {
+        "source_step_id": "N",
+        "commands": [
+          "N=Midpoint(A,C)"
+        ],
+        "expected_labels": [
+          "N"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Tứ diện ABCD",
+      "app": "3d",
+      "givens": [
+        {
+          "text": "ABCD là tứ diện",
+          "source_text": "Cho tứ diện ABCD"
+        }
+      ],
+      "goals": [
+        "MN song song BC"
+      ],
+      "display_choices": [
+        "Dùng một cấu hình không suy biến để minh họa"
+      ],
+      "steps": [
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "A",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "B",
+          "op": "point",
+          "coords": [
+            4.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "C",
+          "op": "point",
+          "coords": [
+            0.0,
+            4.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "D",
+          "op": "point",
+          "coords": [
+            1.0,
+            1.0,
+            3.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "M",
+          "a": "A",
+          "b": "B",
+          "op": "midpoint"
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "N",
+          "a": "A",
+          "b": "C",
+          "op": "midpoint"
+        }
+      ]
+    }
+  },
+  "projection": {
+    "id": "33822941-20b4-578e-8d49-8844492398e5",
+    "version": 1,
+    "app": "3d",
+    "title": "Hình chiếu",
+    "givens": [],
+    "goals": [],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "A",
+        "commands": [
+          "A=(1.0,2.0,3.0)"
+        ],
+        "expected_labels": [
+          "A"
+        ]
+      },
+      {
+        "source_step_id": "O",
+        "commands": [
+          "O=(0.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "O"
+        ]
+      },
+      {
+        "source_step_id": "X",
+        "commands": [
+          "X=(1.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "X"
+        ]
+      },
+      {
+        "source_step_id": "Y",
+        "commands": [
+          "Y=(0.0,1.0,0.0)"
+        ],
+        "expected_labels": [
+          "Y"
+        ]
+      },
+      {
+        "source_step_id": "base",
+        "commands": [
+          "base=Plane(O,X,Y)"
+        ],
+        "expected_labels": [
+          "base"
+        ]
+      },
+      {
+        "source_step_id": "H",
+        "commands": [
+          "ggbAux6=PerpendicularLine(A,base)",
+          "H=Intersect(ggbAux6,base)"
+        ],
+        "expected_labels": [
+          "ggbAux6",
+          "H"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Hình chiếu",
+      "app": "3d",
+      "givens": [],
+      "goals": [],
+      "display_choices": [],
+      "steps": [
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "A",
+          "op": "point",
+          "coords": [
+            1.0,
+            2.0,
+            3.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "O",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "X",
+          "op": "point",
+          "coords": [
+            1.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "Y",
+          "op": "point",
+          "coords": [
+            0.0,
+            1.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "base",
+          "op": "plane",
+          "points": [
+            "O",
+            "X",
+            "Y"
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "H",
+          "op": "projection",
+          "point": "A",
+          "target": "base"
+        }
+      ]
+    }
+  },
+  "line-plane": {
+    "id": "a07a64bf-d1c7-555e-a7d5-6a4a71a169ea",
+    "version": 1,
+    "app": "3d",
+    "title": "Giao tuyến với mặt phẳng",
+    "givens": [],
+    "goals": [
+      "Tìm giao điểm I của đường thẳng d và mặt phẳng z=0"
+    ],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "A",
+        "commands": [
+          "A=(1.0,2.0,3.0)"
+        ],
+        "expected_labels": [
+          "A"
+        ]
+      },
+      {
+        "source_step_id": "B",
+        "commands": [
+          "B=(1.0,2.0,-1.0)"
+        ],
+        "expected_labels": [
+          "B"
+        ]
+      },
+      {
+        "source_step_id": "O",
+        "commands": [
+          "O=(0.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "O"
+        ]
+      },
+      {
+        "source_step_id": "X",
+        "commands": [
+          "X=(1.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "X"
+        ]
+      },
+      {
+        "source_step_id": "Y",
+        "commands": [
+          "Y=(0.0,1.0,0.0)"
+        ],
+        "expected_labels": [
+          "Y"
+        ]
+      },
+      {
+        "source_step_id": "d",
+        "commands": [
+          "d=Line(A,B)"
+        ],
+        "expected_labels": [
+          "d"
+        ]
+      },
+      {
+        "source_step_id": "base",
+        "commands": [
+          "base=Plane(O,X,Y)"
+        ],
+        "expected_labels": [
+          "base"
+        ]
+      },
+      {
+        "source_step_id": "I",
+        "commands": [
+          "I=Intersect(d,base)"
+        ],
+        "expected_labels": [
+          "I"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Giao tuyến với mặt phẳng",
+      "app": "3d",
+      "givens": [],
+      "goals": [
+        "Tìm giao điểm I của đường thẳng d và mặt phẳng z=0"
+      ],
+      "display_choices": [],
+      "steps": [
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "A",
+          "op": "point",
+          "coords": [
+            1.0,
+            2.0,
+            3.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "B",
+          "op": "point",
+          "coords": [
+            1.0,
+            2.0,
+            -1.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "O",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "X",
+          "op": "point",
+          "coords": [
+            1.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "Y",
+          "op": "point",
+          "coords": [
+            0.0,
+            1.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "d",
+          "a": "A",
+          "b": "B",
+          "op": "line"
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "base",
+          "op": "plane",
+          "points": [
+            "O",
+            "X",
+            "Y"
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "I",
+          "a": "d",
+          "b": "base",
+          "op": "intersection"
+        }
+      ]
+    }
+  },
+  "undefined-intersection": {
+    "id": "43d8993a-71ad-5f5c-8379-c44fa42ba81a",
+    "version": 1,
+    "app": "3d",
+    "title": "Parallel",
+    "givens": [],
+    "goals": [],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "A",
+        "commands": [
+          "A=(0.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "A"
+        ]
+      },
+      {
+        "source_step_id": "B",
+        "commands": [
+          "B=(1.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "B"
+        ]
+      },
+      {
+        "source_step_id": "C",
+        "commands": [
+          "C=(0.0,1.0,0.0)"
+        ],
+        "expected_labels": [
+          "C"
+        ]
+      },
+      {
+        "source_step_id": "D",
+        "commands": [
+          "D=(1.0,1.0,0.0)"
+        ],
+        "expected_labels": [
+          "D"
+        ]
+      },
+      {
+        "source_step_id": "l1",
+        "commands": [
+          "l1=Line(A,B)"
+        ],
+        "expected_labels": [
+          "l1"
+        ]
+      },
+      {
+        "source_step_id": "l2",
+        "commands": [
+          "l2=Line(C,D)"
+        ],
+        "expected_labels": [
+          "l2"
+        ]
+      },
+      {
+        "source_step_id": "P",
+        "commands": [
+          "P=Intersect(l1,l2)"
+        ],
+        "expected_labels": [
+          "P"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Parallel",
+      "app": "3d",
+      "givens": [],
+      "goals": [],
+      "display_choices": [],
+      "steps": [
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "A",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "B",
+          "op": "point",
+          "coords": [
+            1.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "C",
+          "op": "point",
+          "coords": [
+            0.0,
+            1.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "D",
+          "op": "point",
+          "coords": [
+            1.0,
+            1.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "l1",
+          "a": "A",
+          "b": "B",
+          "op": "line"
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "l2",
+          "a": "C",
+          "b": "D",
+          "op": "line"
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "P",
+          "a": "l1",
+          "b": "l2",
+          "op": "intersection"
+        }
+      ]
+    }
+  },
+  "function2d": {
+    "id": "ca499aaa-b2f6-51ba-941d-15f0b893fc7a",
+    "version": 1,
+    "app": "graphing",
+    "title": "Sine",
+    "givens": [],
+    "goals": [],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "f",
+        "commands": [
+          "f(x)=If(-6.0<=x<=6.0,sin(x))"
+        ],
+        "expected_labels": [
+          "f"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Sine",
+      "app": "graphing",
+      "givens": [],
+      "goals": [],
+      "display_choices": [],
+      "steps": [
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "f",
+          "op": "function2d",
+          "expression": "sin(x)",
+          "domain": [
+            -6.0,
+            6.0
+          ]
+        }
+      ]
+    }
+  },
+  "surface": {
+    "id": "d9c0348b-5780-5e15-b76c-4344501f0dcc",
+    "version": 1,
+    "app": "3d",
+    "title": "Saddle",
+    "givens": [],
+    "goals": [],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "s",
+        "commands": [
+          "s=Surface(u,v,((u ^ 2) - (v ^ 2)),u,-3.0,3.0,v,-3.0,3.0)"
+        ],
+        "expected_labels": [
+          "s"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Saddle",
+      "app": "3d",
+      "givens": [],
+      "goals": [],
+      "display_choices": [],
+      "steps": [
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "s",
+          "op": "surface_explicit",
+          "expression": "x^2-y^2",
+          "x_domain": [
+            -3.0,
+            3.0
+          ],
+          "y_domain": [
+            -3.0,
+            3.0
+          ]
+        }
+      ]
+    }
+  },
+  "vertical2d": {
+    "id": "b002d78a-045f-55d6-a71b-fa3b49293ff8",
+    "version": 1,
+    "app": "graphing",
+    "title": "Đường thẳng qua A(2,0) song song Oy",
+    "givens": [
+      {
+        "text": "d qua A(2,0) và song song Oy",
+        "source_text": "Vẽ đường thẳng d qua A(2,0) song song trục tung"
+      }
+    ],
+    "goals": [
+      "Đánh dấu giao điểm I với Ox"
+    ],
+    "display_choices": [
+      "B(2,1) xác định hướng Oy; O và X xác định Ox"
+    ],
+    "steps": [
+      {
+        "source_step_id": "A",
+        "commands": [
+          "A=(2.0,0.0)"
+        ],
+        "expected_labels": [
+          "A"
+        ]
+      },
+      {
+        "source_step_id": "B",
+        "commands": [
+          "B=(2.0,1.0)"
+        ],
+        "expected_labels": [
+          "B"
+        ]
+      },
+      {
+        "source_step_id": "O",
+        "commands": [
+          "O=(0.0,0.0)"
+        ],
+        "expected_labels": [
+          "O"
+        ]
+      },
+      {
+        "source_step_id": "X",
+        "commands": [
+          "X=(1.0,0.0)"
+        ],
+        "expected_labels": [
+          "X"
+        ]
+      },
+      {
+        "source_step_id": "f",
+        "commands": [
+          "f(x)=If(-3.0<=x<=3.0,(x ^ 2))"
+        ],
+        "expected_labels": [
+          "f"
+        ]
+      },
+      {
+        "source_step_id": "d",
+        "commands": [
+          "d=Line(A,B)"
+        ],
+        "expected_labels": [
+          "d"
+        ]
+      },
+      {
+        "source_step_id": "ox",
+        "commands": [
+          "ox=Line(O,X)"
+        ],
+        "expected_labels": [
+          "ox"
+        ]
+      },
+      {
+        "source_step_id": "M",
+        "commands": [
+          "M=Midpoint(A,B)"
+        ],
+        "expected_labels": [
+          "M"
+        ]
+      },
+      {
+        "source_step_id": "s",
+        "commands": [
+          "s=Segment(O,B)"
+        ],
+        "expected_labels": [
+          "s"
+        ]
+      },
+      {
+        "source_step_id": "triangle",
+        "commands": [
+          "triangle=Polygon(O,A,B)"
+        ],
+        "expected_labels": [
+          "triangle"
+        ]
+      },
+      {
+        "source_step_id": "I",
+        "commands": [
+          "I=Intersect(d,ox)"
+        ],
+        "expected_labels": [
+          "I"
+        ]
+      },
+      {
+        "source_step_id": "H",
+        "commands": [
+          "H=ClosestPoint(ox,B)"
+        ],
+        "expected_labels": [
+          "H"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Đường thẳng qua A(2,0) song song Oy",
+      "app": "graphing",
+      "givens": [
+        {
+          "text": "d qua A(2,0) và song song Oy",
+          "source_text": "Vẽ đường thẳng d qua A(2,0) song song trục tung"
+        }
+      ],
+      "goals": [
+        "Đánh dấu giao điểm I với Ox"
+      ],
+      "display_choices": [
+        "B(2,1) xác định hướng Oy; O và X xác định Ox"
+      ],
+      "steps": [
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "A",
+          "op": "point",
+          "coords": [
+            2.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "B",
+          "op": "point",
+          "coords": [
+            2.0,
+            1.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "O",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "X",
+          "op": "point",
+          "coords": [
+            1.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "d",
+          "a": "A",
+          "b": "B",
+          "op": "line"
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "ox",
+          "a": "O",
+          "b": "X",
+          "op": "line"
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "I",
+          "a": "d",
+          "b": "ox",
+          "op": "intersection"
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "M",
+          "a": "A",
+          "b": "B",
+          "op": "midpoint"
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "H",
+          "op": "projection",
+          "point": "B",
+          "target": "ox"
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "s",
+          "a": "O",
+          "b": "B",
+          "op": "segment"
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "triangle",
+          "op": "polygon",
+          "points": [
+            "O",
+            "A",
+            "B"
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "f",
+          "op": "function2d",
+          "expression": "x^2",
+          "domain": [
+            -3.0,
+            3.0
+          ]
+        }
+      ]
+    }
+  },
+  "sphere": {
+    "id": "07dc9cf7-5a29-599a-983b-cef26147f41b",
+    "version": 1,
+    "app": "3d",
+    "title": "Mặt cầu và tiếp tuyến theo phương Oy",
+    "givens": [
+      {
+        "text": "Chọn ví dụ mặt cầu và đường tiếp tuyến theo phương cho trước",
+        "source_text": "bài toán mặt cầu, giúp mình tạo ra 1 phương trình ví dụ nào cũng được, tiếp tuyến có phương cho trước, mục tiêu là cả phương trình và hình vẽ"
+      }
+    ],
+    "goals": [
+      "Minh họa x^2+y^2+z^2=4 và tiếp tuyến (x,y,z)=(2,0,0)+t(0,1,0)"
+    ],
+    "display_choices": [
+      "Chọn tâm O(0,0,0), bán kính 2, tiếp điểm M(2,0,0) và phương (0,1,0)"
+    ],
+    "steps": [
+      {
+        "source_step_id": "O",
+        "commands": [
+          "O=(0.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "O"
+        ]
+      },
+      {
+        "source_step_id": "M",
+        "commands": [
+          "M=(2.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "M"
+        ]
+      },
+      {
+        "source_step_id": "Q",
+        "commands": [
+          "Q=(2.0,1.0,0.0)"
+        ],
+        "expected_labels": [
+          "Q"
+        ]
+      },
+      {
+        "source_step_id": "ball",
+        "commands": [
+          "ball=Sphere(O,2.0)"
+        ],
+        "expected_labels": [
+          "ball"
+        ]
+      },
+      {
+        "source_step_id": "tangent",
+        "commands": [
+          "tangent=Line(M,Q)"
+        ],
+        "expected_labels": [
+          "tangent"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Mặt cầu và tiếp tuyến theo phương Oy",
+      "app": "3d",
+      "givens": [
+        {
+          "text": "Chọn ví dụ mặt cầu và đường tiếp tuyến theo phương cho trước",
+          "source_text": "bài toán mặt cầu, giúp mình tạo ra 1 phương trình ví dụ nào cũng được, tiếp tuyến có phương cho trước, mục tiêu là cả phương trình và hình vẽ"
+        }
+      ],
+      "goals": [
+        "Minh họa x^2+y^2+z^2=4 và tiếp tuyến (x,y,z)=(2,0,0)+t(0,1,0)"
+      ],
+      "display_choices": [
+        "Chọn tâm O(0,0,0), bán kính 2, tiếp điểm M(2,0,0) và phương (0,1,0)"
+      ],
+      "steps": [
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "O",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "M",
+          "op": "point",
+          "coords": [
+            2.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "Q",
+          "op": "point",
+          "coords": [
+            2.0,
+            1.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "ball",
+          "op": "sphere",
+          "center": "O",
+          "radius": 2.0,
+          "through": null
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "tangent",
+          "a": "M",
+          "b": "Q",
+          "op": "line"
+        }
+      ]
+    }
+  },
+  "integral-region": {
+    "id": "cc3ccc3c-4761-5078-9577-aaf5c09aa8fb",
+    "version": 1,
+    "app": "graphing",
+    "title": "Diện tích giữa hai đồ thị",
+    "givens": [
+      {
+        "text": "y=x^2+1 và y=x+3 trên [-1,2]",
+        "source_text": "Tính diện tích giữa y=x^2+1 và y=x+3, hai giao điểm x=-1 và x=2, vẽ và tô miền cần tính"
+      }
+    ],
+    "goals": [
+      "Tô miền giữa hai đồ thị trên [-1,2]"
+    ],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "f",
+        "commands": [
+          "f(x)=If(-3.0<=x<=3.0,((x ^ 2) + 1))"
+        ],
+        "expected_labels": [
+          "f"
+        ]
+      },
+      {
+        "source_step_id": "g",
+        "commands": [
+          "g(x)=If(-3.0<=x<=3.0,(x + 3))"
+        ],
+        "expected_labels": [
+          "g"
+        ]
+      },
+      {
+        "source_step_id": "region",
+        "commands": [
+          "region=IntegralBetween(g,f,-1.0,2.0)"
+        ],
+        "expected_labels": [
+          "region"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Diện tích giữa hai đồ thị",
+      "app": "graphing",
+      "givens": [
+        {
+          "text": "y=x^2+1 và y=x+3 trên [-1,2]",
+          "source_text": "Tính diện tích giữa y=x^2+1 và y=x+3, hai giao điểm x=-1 và x=2, vẽ và tô miền cần tính"
+        }
+      ],
+      "goals": [
+        "Tô miền giữa hai đồ thị trên [-1,2]"
+      ],
+      "display_choices": [],
+      "steps": [
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "f",
+          "op": "function2d",
+          "expression": "x^2+1",
+          "domain": [
+            -3.0,
+            3.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "g",
+          "op": "function2d",
+          "expression": "x+3",
+          "domain": [
+            -3.0,
+            3.0
+          ]
+        },
+        {
+          "caption": "Miền cần tính diện tích",
+          "fill_opacity": 0.5,
+          "id": "region",
+          "op": "command",
+          "name": "IntegralBetween",
+          "args": [
+            {
+              "ref": "g"
+            },
+            {
+              "ref": "f"
+            },
+            {
+              "number": -1.0
+            },
+            {
+              "number": 2.0
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "documented-cone": {
+    "id": "f6f244de-2aa1-5b0e-9aa4-0199d07bb882",
+    "version": 1,
+    "app": "3d",
+    "title": "Hình nón từ lệnh tra trong manual",
+    "givens": [],
+    "goals": [
+      "Dựng hình nón có chiều cao 4, bán kính 2"
+    ],
+    "display_choices": [],
+    "steps": [
+      {
+        "source_step_id": "O",
+        "commands": [
+          "O=(0.0,0.0,0.0)"
+        ],
+        "expected_labels": [
+          "O"
+        ]
+      },
+      {
+        "source_step_id": "S",
+        "commands": [
+          "S=(0.0,0.0,4.0)"
+        ],
+        "expected_labels": [
+          "S"
+        ]
+      },
+      {
+        "source_step_id": "solid",
+        "commands": [
+          "solid=Cone(O,S,2.0)"
+        ],
+        "expected_labels": [
+          "solid"
+        ]
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "title": "Hình nón từ lệnh tra trong manual",
+      "app": "3d",
+      "givens": [],
+      "goals": [
+        "Dựng hình nón có chiều cao 4, bán kính 2"
+      ],
+      "display_choices": [],
+      "steps": [
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "O",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "caption": null,
+          "fill_opacity": null,
+          "id": "S",
+          "op": "point",
+          "coords": [
+            0.0,
+            0.0,
+            4.0
+          ]
+        },
+        {
+          "caption": "Hình nón",
+          "fill_opacity": 0.3,
+          "id": "solid",
+          "op": "command",
+          "name": "Cone",
+          "args": [
+            {
+              "ref": "O"
+            },
+            {
+              "ref": "S"
+            },
+            {
+              "number": 2.0
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

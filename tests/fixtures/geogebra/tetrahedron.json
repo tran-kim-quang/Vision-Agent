@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "title": "Tứ diện ABCD",
+  "app": "3d",
+  "givens": [{"text": "ABCD là tứ diện", "source_text": "Cho tứ diện ABCD"}],
+  "goals": ["MN song song BC"],
+  "display_choices": ["Dùng một cấu hình không suy biến để minh họa"],
+  "steps": [
+    {"id": "A", "op": "point", "coords": [0, 0, 0]},
+    {"id": "B", "op": "point", "coords": [4, 0, 0]},
+    {"id": "C", "op": "point", "coords": [0, 4, 0]},
+    {"id": "D", "op": "point", "coords": [1, 1, 3]},
+    {"id": "M", "op": "midpoint", "a": "A", "b": "B"},
+    {"id": "N", "op": "midpoint", "a": "A", "b": "C"}
+  ]
+}

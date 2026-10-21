@@ -1,0 +1,12 @@
+"""Validated, deterministic bridge from semantic geometry to GeoGebra."""
+
+from .expressions import ExpressionError, ExpressionNode, emit_expression, parse_expression
+from .compiler import CommandStep, GeometryArtifact, compile_construction
+from .schema import ConstructionSpec, Given, Step
+from .validation import SpecError, ValidatedConstruction, validate_spec
+
+__all__ = [
+    "ConstructionSpec", "Given", "Step", "ExpressionError", "ExpressionNode",
+    "emit_expression", "parse_expression", "SpecError", "ValidatedConstruction", "validate_spec",
+    "CommandStep", "GeometryArtifact", "compile_construction",
+]

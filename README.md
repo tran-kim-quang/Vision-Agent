@@ -277,4 +277,104 @@ trace thực thi LangGraph tại [smith.langchain.com](https://smith.langchain.c
 
 [assets/demo_test.mp4](assets/demo_test.mp4)
 
+## 3D Geometry Viewer (nhánh feature/geo3d-viewer)
+
+Viewer hình học không gian 3D tương tác (three.js): spec ngữ nghĩa → kernel tự tính tọa độ → cổng kiểm tra (cấu trúc + khẳng định hình học) → render. LLM không bao giờ được cấp tọa độ trực tiếp, nên hình sai bị chặn trước khi vẽ.
+
+- Trang viewer: `http://localhost:8000/geo3d/` (xoay/kéo/zoom, click đỉnh xem tọa độ, cạnh khuất tự vẽ nét đứt)
+- API: `GET /geometry/presets`, `GET /geometry/presets/{id}`, `POST /geometry/build`
+- Mã nguồn: package `geometry3d/` (kernel + validator + preset SGK Toán 12), kiểm thử: `python tests/test_geometry3d.py`
+
+## GeoGebra construction agent
+
+Luồng GeoGebra nhận yêu cầu hình học hoặc đồ thị hàm số, giao cho `geometry_agent` trích xuất giả thiết và quan hệ, kiểm tra một spec có kiểu, rồi gửi artifact hoàn chỉnh tới frontend. GeoGebra chỉ được tải khi người dùng bấm **Mở hình**. Ví dụ:
+
+- `Vẽ tứ diện ABCD, M và N là trung điểm AB và AC.`
+- `Vẽ hình chiếu vuông góc của A(1,2,3) lên mặt phẳng z=0.`
+- `Vẽ đồ thị sin(x) trên [-6,6].`
+- `Vẽ mặt z=x^2-y^2 với x,y thuộc [-3,3].`
+- `Vẽ trong Oxy đường thẳng qua A(2,0) song song trục tung, đánh dấu giao điểm với Ox.`
+- `Vẽ mặt cầu tâm O(0,0,0), bán kính 2 và tiếp tuyến tại M(2,0,0) theo phương (0,1,0), kèm phương trình.`
+
+Agent chọn 2D hoặc 3D theo yêu cầu hiện tại và có thể chuyển đổi trong cùng cuộc hội thoại. 2D hỗ trợ điểm, đoạn thẳng, đường thẳng (kể cả `x=c`), đa giác, trung điểm, giao hai đường, hình chiếu lên đường và đồ thị `y=f(x)`. 3D hỗ trợ các phép dựng không gian, mặt phẳng và mặt `z=f(x,y)`. Đường thẳng phải qua hai điểm phân biệt.
+
+Trong spec, `app="graphing"` biểu thị hình 2D: điểm nhận `[x,y]` hoặc `[x,y,0]`; compiler luôn phát `(x,y)`. Viewer chọn app GeoGebra **Geometry** khi có phép dựng và **Graphing Calculator** khi chỉ có đồ thị hàm số, vì Graphing Calculator không hỗ trợ một số lệnh như `Midpoint`. Với `app="3d"`, điểm phải có `[x,y,z]`; điểm ngoài Oxy và các bước `plane`/`surface_explicit` bị từ chối trong 2D.
+
+Mặt cầu dùng bước `sphere` với `center` tham chiếu một điểm và **một trong hai** trường: `radius` là số hữu hạn dương, hoặc `through` tham chiếu điểm trên mặt cầu. Compiler phát lệnh `Sphere` thật trong app 3D; viewer hiển thị mặt cầu trong suốt để nhìn được các điểm và đường liên quan. Các điểm rời rạc không thay thế cho mặt cầu. Đường tiếp tuyến 3D dùng vectơ phương; mặt phẳng tiếp diện là đối tượng khác.
+
+Nhãn trên hình mặc định chỉ hiện tên đối tượng, không kèm phương trình hoặc tọa độ. Mọi bước dựng có thể thêm `caption` (1–80 ký tự), ví dụ `Tâm O`, `Mặt cầu (S)`, `Tiếp tuyến d`. Caption chỉ đổi chữ minh họa, giữ nguyên id, tham chiếu và phương trình; phần đại số vẫn hiển thị công thức. Có thể yêu cầu agent đặt nhãn cụ thể ngay trong câu hỏi.
+
+### Tra cú pháp theo yêu cầu
+
+Agent có hai tool chỉ đọc tài liệu từ snapshot của [repo tài liệu chính thức](https://github.com/geogebra/manual):
+
+- `search_geogebra_docs(query)`: tìm theo tên lệnh và nội dung tiếng Anh, tối đa 5 kết quả ngắn. Agent chuyển ý định tiếng Việt thành từ khóa tiếng Anh, ví dụ `cone vertex radius`.
+- `get_command_docs(command, offset=0)`: đọc cú pháp, ví dụ và lưu ý của đúng một lệnh, tối đa 4.000 ký tự mỗi lần; trang dài có `next_offset` để đọc tiếp.
+
+Tìm kiếm cục bộ dùng điểm BM25 và ưu tiên tên lệnh trùng khớp; chưa cần embedding hoặc vector database. Toàn bộ manual không được chèn vào system prompt. Chỉ các đoạn agent tra mới xuất hiện trong kết quả tool, kèm URL nguồn và commit. Mỗi yêu cầu tối đa 8 lần tra tài liệu, tách khỏi ngân sách 3 lần chuẩn bị hình. Sau khi tra cú pháp, agent có thể phát bước `command` với tên lệnh và đối số có cấu trúc: tham chiếu đối tượng, số, boolean, biểu thức toán hoặc danh sách. Danh mục lệnh toán học được suy ra từ snapshot; các lệnh scripting bị loại. Compiler không nhận chuỗi mã GeoGebra hay JavaScript tự do. Kết quả của lệnh tổng quát có kiểu động; phép dựng tiếp theo dùng kết quả đó có thể tiếp tục qua bước `command`, còn các operation có kiểu vẫn giữ kiểm tra loại đối tượng.
+
+Để tô miền giữa hai đồ thị, artifact phải chứa đối tượng miền thật, ví dụ `IntegralBetween(g,f,-1,2)`, cùng `fill_opacity` trong [0,1]. Viewer đặt màu, độ tô và kiểm tra thuộc tính hiển thị; lỗi thực thi được báo thay vì báo hình đã sẵn sàng. Với f=x²+1 và g=x+3, miền có diện tích 4,5. Cùng đường lệnh tổng quát cũng dựng được `Cone`, không cần thêm operation riêng cho từng hình. Backend lưu trace `geometry_prepared` gồm lệnh đã biên dịch và độ tô để điều tra; trace này chưa phải xác nhận render từ trình duyệt hay bằng chứng cho mọi quan hệ toán học.
+
+Snapshot được đóng gói tại `geometry3d/geogebra/manual/commands.json`, không tải mạng khi chat. Cập nhật từ repo sạch bằng:
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse https://github.com/geogebra/manual.git /tmp/geogebra-manual
+git -C /tmp/geogebra-manual sparse-checkout set en/modules/ROOT/pages/commands
+python scripts/sync_geogebra_docs.py --source-repo /tmp/geogebra-manual
+python -m unittest discover -s tests -p 'test_geogebra_documentation.py'
+```
+
+Muốn tái tạo cùng phiên bản, checkout commit ghi trong snapshot trước khi chạy script. Khi đổi corpus trong tiến trình đang chạy, khởi động lại backend để nạp chỉ mục mới.
+
+Có thể chọn model riêng trong `.env`; nếu bỏ trống, geometry agent dùng model của supervisor:
+
+```env
+GEOMETRY_MODEL_NAME=gemma4:31b-cloud
+```
+
+Chạy backend và frontend khi phát triển:
+
+```bash
+uvicorn api:app --reload --port 8000
+cd frontend
+npm install
+npm run dev
+```
+
+Các lệnh kiểm thử:
+
+```bash
+python -m unittest discover -s tests -p 'test_geogebra_*.py' -v
+python tests/test_geometry3d.py
+cd frontend
+npm run test:unit
+npm run test:e2e
+npm run test:e2e:real
+npm run build
+```
+
+Kiểm tra model thật theo `.env` với ba lượt liên tiếp 2D → 3D → 2D (có gọi API model):
+
+```bash
+GEOGEBRA_LIVE_TESTS=1 GEOGEBRA_LIVE_ARTIFACTS=/tmp/geogebra-live.json python -m unittest discover -s tests -p 'test_geogebra_live.py' -v
+cd frontend
+GEOGEBRA_LIVE_ARTIFACTS=/tmp/geogebra-live.json npm run test:e2e:real
+```
+
+Ca mặt cầu có thể chạy riêng từ gốc repo (qua supervisor và geometry agent), rồi kiểm tra artifact của model trên GeoGebra thật:
+
+```bash
+GEOGEBRA_LIVE_TESTS=1 GEOGEBRA_SPHERE_ARTIFACT=/tmp/geogebra-sphere.json python -m unittest discover -s tests -p 'test_geogebra_live.py' -k sphere
+cd frontend
+GEOGEBRA_SPHERE_ARTIFACT=/tmp/geogebra-sphere.json npm run test:e2e:real -- --grep 'sphere creates'
+```
+
+Test model thật được bỏ qua mặc định. Bước trình duyệt kiểm tra tọa độ giao điểm, trung điểm 3D và giá trị parabol từ chính artifact của model; luồng SSE được giả lập, còn GeoGebra chạy thật.
+
+Mỗi artifact thuộc một lượt chat và tồn tại trong bộ nhớ của phiên frontend. Khi đóng workspace, XML hiện tại được giữ để mở lại vẫn còn chỉnh sửa của người dùng; **New chat** xóa cache đó và hủy stream đang chạy. Nếu stream ngắt sau khi artifact đã tới, thẻ hình vẫn được giữ. Nếu GeoGebra từ chối lệnh hoặc tạo đối tượng không xác định, viewer dừng tại bước lỗi và cho phép thử lại.
+
+Hình dựng là công cụ minh họa và khám phá. Agent không xác nhận rằng mục tiêu hình học đã được chứng minh. Luồng Three.js cũ tại `/geo3d/` và các API `/geometry/*` vẫn hoạt động riêng, không dùng artifact GeoGebra.
+
+Frontend nhúng script chính thức `deployggb.js`. GeoGebra cho phép sử dụng phi thương mại theo giấy phép của họ; mục đích thương mại cần thỏa thuận giấy phép riêng, vì vậy phải kiểm tra điều khoản theo cách triển khai thực tế. Tham khảo [GeoGebra Apps Embedding](https://geogebra.github.io/docs/reference/en/GeoGebra_Apps_Embedding/), [Apps API](https://geogebra.github.io/docs/reference/en/GeoGebra_Apps_API/), [Function](https://geogebra.github.io/docs/manual/en/commands/Function/), [Surface](https://geogebra.github.io/docs/manual/en/commands/Surface/) và [GeoGebra license](https://www.geogebra.org/license).
+
 

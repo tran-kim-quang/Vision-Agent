@@ -2,10 +2,14 @@
   "name": "visual-agent-ui",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:unit": "node --test tests/geometry-*.test.js",
+    "test:e2e": "playwright test --grep-invert @real",
+    "test:e2e:real": "playwright test --grep @real"
   },
   "dependencies": {
     "katex": "^0.16.22",
@@ -17,6 +21,7 @@
     "remark-math": "^5.1.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^6.4.3"
   }

@@ -3,11 +3,15 @@ import ReactMarkdown from 'react-markdown'
 import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
+import GeometryArtifactCard from './geometry/GeometryArtifactCard.jsx'
+import GeoGebraViewer from './geometry/GeoGebraViewer.jsx'
+import { consumeSSEBuffer, createGeometryTurn, reduceGeometryTurn } from './geometry/chatState.js'
 
 const AGENT_META = {
   supervisor:     { icon: '🎯', label: 'Supervisor',      color: '#818cf8' },
   research_agent: { icon: '🔬', label: 'Research Agent',  color: '#60a5fa' },
   vision_agent:   { icon: '👁️',  label: 'Vision Agent',   color: '#f59e0b' },
+  geometry_agent: { icon: '📐', label: 'Geometry Agent', color: '#22c55e' },
   agent:          { icon: '🧠', label: 'Agent Reasoning', color: '#60a5fa' },
   tools:          { icon: '🔧', label: 'Tool Execution',  color: '#34d399' },
 }
@@ -142,7 +146,7 @@ function Lightbox({ src, onClose }) {
 }
 
 // ── Chat message bubble ────────────────────────────────────────────────────
-function ChatMessage({ msg }) {
+function ChatMessage({ msg, onOpenArtifact }) {
   const isUser = msg.role === 'user'
   const [lightbox, setLightbox] = useState(false)
 
@@ -167,6 +171,11 @@ function ChatMessage({ msg }) {
             </div>
           )
         }
+        {!isUser && msg.artifacts?.map(artifact => (
+          <GeometryArtifactCard key={artifact.id} artifact={artifact} onOpen={onOpenArtifact} />
+        ))}
+        {!isUser && msg.streamError && <p className="geometry-stream-error">⚠ {msg.streamError}</p>}
+        {!isUser && !msg.finalized && !msg.text && !msg.artifacts?.length && <span className="thinking">thinking…</span>}
       </div>
       {lightbox && <Lightbox src={msg.imagePreview} onClose={() => setLightbox(false)} />}
     </div>
@@ -199,12 +208,16 @@ export default function App() {
 
   const [errorMsg, setErrorMsg] = useState('')
   const [handoffNotice, setHandoffNotice] = useState(null)
+  const [selectedArtifact, setSelectedArtifact] = useState(null)
 
   const chatEndRef = useRef(null)
   const fileInputRef = useRef(null)
   const handoffTimerRef = useRef(null)
   const lastHandoffRef = useRef({ target: '', at: 0 })
   const agentTextAccumRef = useRef({})
+  const activeTurnRef = useRef(null)
+  const streamAbortRef = useRef(null)
+  const geometryStateCacheRef = useRef(new Map())
   // Mirror of streamingText in a ref so the 'done' handler can read the
   // current value synchronously without calling setState inside a setState updater.
   const streamingTextRef = useRef('')
@@ -215,6 +228,7 @@ export default function App() {
 
   useEffect(() => () => {
     if (handoffTimerRef.current) clearTimeout(handoffTimerRef.current)
+    streamAbortRef.current?.abort()
   }, [])
 
   const showAgentNotice = useCallback((target) => {
@@ -313,8 +327,21 @@ export default function App() {
     })
   }, [])
 
+  const applyTurnEvent = useCallback((event, turnId) => {
+    const current = activeTurnRef.current
+    if (!current || current.id !== turnId) return
+    const next = reduceGeometryTurn(current, event)
+    if (next === current) return
+    activeTurnRef.current = next
+    setChatHistory(history => history.map(item => item.id === turnId ? next : item))
+  }, [])
+
   // ── SSE handler ────────────────────────────────────────────────────────────
-  const handleEvent = useCallback((event) => {
+  const handleEvent = useCallback((event, turnId) => {
+    if (event.type === 'request_start' || event.type === 'geometry_artifact') {
+      applyTurnEvent(event, turnId)
+      return
+    }
     switch (event.type) {
       case 'agent_start':
         setAgentOrder(prev => prev.includes(event.agent) ? prev : [...prev, event.agent])
@@ -329,6 +356,7 @@ export default function App() {
         if (event.agent === 'supervisor') {
           streamingTextRef.current += event.content
           setStreamingText(prev => prev + event.content)
+          applyTurnEvent(event, turnId)
         } else {
           pushSection(event.agent, { type: 'text', content: event.content })
         }
@@ -350,6 +378,7 @@ export default function App() {
         break
       case 'error':
         setErrorMsg(event.content)
+        applyTurnEvent(event, turnId)
         break
       case 'done': {
         setHandoffNotice(null)
@@ -364,7 +393,7 @@ export default function App() {
         let final = streamingTextRef.current
         if (!final.trim() && !event.supervisor_responded) {
           const accum = agentTextAccumRef.current
-          for (const name of ['agent', 'research_agent', 'vision_agent']) {
+          for (const name of ['agent', 'research_agent', 'vision_agent', 'geometry_agent']) {
             if (accum[name]?.trim()) { final = accum[name]; break }
           }
           if (!final.trim()) {
@@ -377,16 +406,14 @@ export default function App() {
         // Commit to chat history and clear display — separate setState calls,
         // never nested inside each other (calling setState inside a setState
         // updater is a React anti-pattern that silently drops the inner update).
-        if (final.trim()) {
-          setChatHistory(h => [...h, { role: 'assistant', text: final }])
-        }
+        applyTurnEvent({ type: 'finalize', text: final }, turnId)
         streamingTextRef.current = ''
         setStreamingText('')
         break
       }
       default: break
     }
-  }, [pushSection, showAgentNotice, showHandoffNotice])
+  }, [applyTurnEvent, pushSection, showAgentNotice, showHandoffNotice])
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -403,12 +430,20 @@ export default function App() {
       }]
       : []
 
-    // Add user message to history
+    const turn = createGeometryTurn(sessionId)
+    const turnId = turn.id
+    activeTurnRef.current = turn
+    streamAbortRef.current?.abort()
+    const controller = new AbortController()
+    streamAbortRef.current = controller
+
+    // Add the user message and its assistant turn atomically.
     setChatHistory(h => [...h, {
       role: 'user',
+      id: genSessionId(),
       text: input.trim() || '(image)',
       imagePreview: attachedImage?.previewUrl,
-    }])
+    }, turn])
     setInput('')
     clearImageAfterSend()  // don't revoke — URL is now owned by chatHistory
 
@@ -427,29 +462,47 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, session_id: sessionId, attachments }),
+        signal: controller.signal,
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let receivedDone = false
+      const dispatchEvents = events => {
+        for (const event of events) {
+          if (event.type === 'done') receivedDone = true
+          handleEvent(event, turnId)
+        }
+      }
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop()
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try { handleEvent(JSON.parse(line.slice(6))) } catch { /* skip */ }
-          }
-        }
+        const parsed = consumeSSEBuffer(buffer, decoder.decode(value, { stream: true }))
+        buffer = parsed.buffer
+        dispatchEvents(parsed.events)
+      }
+      const parsed = consumeSSEBuffer(buffer, decoder.decode(), true)
+      dispatchEvents(parsed.events)
+      if (!receivedDone) {
+        const message = 'Luồng phản hồi kết thúc trước khi hoàn tất.'
+        applyTurnEvent({ type: 'error', content: message }, turnId)
+        setErrorMsg(message)
       }
     } catch (err) {
-      setErrorMsg(err.message)
+      if (err.name !== 'AbortError') {
+        const message = err.message || 'Kết nối bị gián đoạn.'
+        applyTurnEvent({ type: 'error', content: message }, turnId)
+        setErrorMsg(message)
+      }
+    } finally {
+      applyTurnEvent({ type: 'finalize' }, turnId)
+      if (streamAbortRef.current === controller) {
+        streamAbortRef.current = null
+        setIsStreaming(false)
+      }
     }
-
-    setIsStreaming(false)
   }
 
   const onKeyDown = (e) => {
@@ -457,6 +510,10 @@ export default function App() {
   }
 
   const newChat = () => {
+    streamAbortRef.current?.abort()
+    streamAbortRef.current = null
+    activeTurnRef.current = null
+    geometryStateCacheRef.current.clear()
     // New UUID = new LangGraph thread = agent starts fresh
     const id = genSessionId()
     localStorage.setItem(_LS_KEY, id)
@@ -466,6 +523,8 @@ export default function App() {
     setAgentOrder([])
     setStreamingText('')
     setErrorMsg('')
+    setSelectedArtifact(null)
+    setIsStreaming(false)
   }
 
   const subAgents = agentOrder.filter(n => n !== 'supervisor')
@@ -530,30 +589,22 @@ export default function App() {
               </div>
             )}
 
-            {chatHistory.map((msg, i) => <ChatMessage key={i} msg={msg} />)}
-
-            {/* Streaming assistant reply */}
-            {(isStreaming || streamingText) && (
-              <div className="chat-msg assistant">
-                <div className="chat-avatar">🤖</div>
-                <div className="chat-bubble">
-                  {streamingText
-                    ? (
-                      <div className="response-markdown">
-                        <MarkdownStream>{streamingText}</MarkdownStream>
-                        {isStreaming && <span className="cursor">▊</span>}
-                      </div>
-                    )
-                    : <span className="thinking">thinking…</span>
-                  }
-                </div>
-              </div>
-            )}
+            {chatHistory.map((msg, i) => (
+              <ChatMessage key={msg.id ?? i} msg={msg} onOpenArtifact={setSelectedArtifact} />
+            ))}
 
             <div ref={chatEndRef} />
           </div>
         </section>
       </div>
+
+      {selectedArtifact && (
+        <GeoGebraViewer
+          artifact={selectedArtifact}
+          stateCache={geometryStateCacheRef.current}
+          onClose={() => setSelectedArtifact(null)}
+        />
+      )}
 
       {/* Error banner */}
       {handoffNotice && (

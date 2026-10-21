@@ -12,3 +12,5 @@ __pycache__/
 poetry.lock
 
 frontend/node_modules
+
+.worktrees/
